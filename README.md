@@ -69,10 +69,6 @@ mkdocs build
 
 欢迎提交 Issue 和 Pull Request 来改进文档。
 
-## 许可证
-
-详见项目仓库中的 LICENSE 文件。
-
 ## 联系方式
 
 如有问题，请通过 GitHub Issues 联系。

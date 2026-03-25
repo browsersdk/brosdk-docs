@@ -1,6 +1,5 @@
 # MkDocs build directory
-site/
-
+site
 # Python
 __pycache__/
 *.py[cod]
