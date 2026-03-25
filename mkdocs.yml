@@ -1,0 +1,103 @@
+# MkDocs configuration for BroSDK Documentation
+
+site_name: BroSDK 文档
+site_description: BroSDK 浏览器环境管理文档
+site_url: https://browsersdk.github.io/brosdk-docs/
+site_author: BroSDK Team
+
+# Repository
+repo_name: browsersdk/brosdk-docs
+repo_url: https://github.com/browsersdk/brosdk-docs
+
+# Copyright
+copyright: Copyright &copy; 2026 BroSDK Team
+
+# Theme
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - toc.follow
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+# Plugins
+plugins:
+  - search
+
+# Extensions
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+  - footnotes
+
+# Navigation structure
+nav:
+  - 首页: index.md
+  - 快速开始: quick-start.md
+  - SDK 参考: sdk-reference.md
+  - 用户指南:
+    - 环境管理: user-guide/environment.md
+  - API 参考:
+    - 服务端 API: api/server.md
+    - SDK API: api/sdk.md
+  - 集成指南:
+    - C 语言集成: integration/c-native.md
+  - 故障排除: troubleshooting.md
+  - 部署指南: deployment.md
+
+# Additional settings
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/browsersdk/brosdk-docs
+    - icon: fontawesome/solid/globe
+      link: https://www.brosdk.com
+  analytics:
+    feedback:
+      title: Was this page helpful?
+      ratings:
+        - icon: material/thumb-up-outline
+          name: This page was helpful
+          data: 1
+          note: Thanks for feedback!
+        - icon: material/thumb-down-outline
+          name: This page could be improved
+          data: 0
+          note: Thanks for feedback!

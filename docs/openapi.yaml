@@ -1,0 +1,167 @@
+openapi: 3.0.3
+info:
+  title: BroSDK API
+  description: BroSDK - 浏览器环境管理和自动化平台 API 文档
+  version: 1.0.0
+  contact:
+    name: BroSDK Team
+    url: https://github.com/browsersdk/brosdk-docs
+    email: support@brosdk.com
+
+servers:
+  - url: https://api.brosdk.com
+    description: 生产环境
+
+tags:
+  - name: 认证
+    description: User Sign 获取和管理
+  - name: 环境管理
+    description: 浏览器环境创建、更新、查询、销毁
+  - name: 应用管理
+    description: 应用创建和管理
+  - name: 用户管理
+    description: 用户登录和信息管理
+  - name: 订单支付
+    description: 充值套餐和订单管理
+  - name: 统计信息
+    description: 使用统计和报表
+
+paths:
+  /api/v2/browser/getUserSig:
+    post:
+      tags:
+        - 认证
+      summary: 获取 User Sign
+      description: 获取用户签名（JWT 令牌）用于 SDK 身份认证
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customerId
+              properties:
+                customerId:
+                  type: string
+                  description: 三方用户唯一 ID
+                duration:
+                  type: integer
+                  description: 有效期（秒），默认 86400（1 天），最大 2592000（30 天）
+                  default: 86400
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  msg:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    properties:
+                      userSig:
+                        type: string
+                        description: JWT 令牌
+                      expireTime:
+                        type: integer
+                        description: 过期时间戳
+
+  /api/v2/browser/create:
+    post:
+      tags:
+        - 环境管理
+      summary: 创建环境
+      description: 创建新的浏览器环境
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customerId
+                - finger
+              properties:
+                envName:
+                  type: string
+                  description: 环境名称
+                customerId:
+                  type: string
+                  description: 三方用户 ID
+                region:
+                  type: string
+                  description: 国家代号（US, CN 等）
+                proxy:
+                  type: string
+                  description: 代理配置 (socks5://user:pwd@ip:port)
+                ipChannel:
+                  type: string
+                  enum: [ip2location, ipdata]
+                  description: IP 监测渠道
+                finger:
+                  $ref: '#/components/schemas/FingerConfig'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  msg:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      envId:
+                        type: string
+                        description: 环境 ID
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 服务端 API 使用 API Key，SDK API 使用 User Sign
+
+  schemas:
+    FingerConfig:
+      type: object
+      properties:
+        system:
+          type: string
+          enum: [Windows 10, Windows 11, macOS, Linux]
+          description: 操作系统
+        kernel:
+          type: string
+          enum: [Chrome, Firefox, Edge]
+          description: 浏览器内核
+        kernelVersion:
+          type: string
+          description: 内核版本 (120-148)
+        webRTC:
+          type: integer
+          enum: [1, 2, 5]
+          description: 1=真实，2=替换，5=禁用
+        canvas:
+          type: integer
+          enum: [1, 2, 3, 4]
+          description: 1=真实，2=随机，4=一致性，3=关闭
+        webGl:
+          type: integer
+          enum: [1, 2]
+          description: 1=隐身，2=真实
