@@ -93,6 +93,7 @@ nav:
 
 # Additional settings
 extra:
+  generator: false  # Hide "Made with Material for MkDocs"
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/browsersdk/brosdk-docs
