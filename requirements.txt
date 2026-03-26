@@ -4,6 +4,9 @@ mkdocs>=1.6.0
 # Theme
 mkdocs-material>=9.5.0
 
+# Plugins
+mkdocs-mermaid2-plugin>=1.2.0
+
 # Markdown Extensions
 markdown>=3.7
 pymdown-extensions>=10.0

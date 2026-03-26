@@ -6,16 +6,29 @@
 
 BroSDK 由以下核心组件组成：
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   用户应用      │────▶│  BroSDK SDK     │────▶│  浏览器内核     │
-│  (C++/Go/TS)   │     │  (C++ DLL/SO)   │     │  (Chromium)    │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-       ▲                         ▲
-       │                         │
-       │ 1. 获取 User Sign       │
-       └─────────────────────────┘
-              BroSDK 服务器
+```mermaid
+flowchart LR
+    subgraph Client["客户端"]
+        App["用户应用<br/>(C++/Go/TS)"]
+        SDK["BroSDK SDK<br/>(C++ DLL/SO)"]
+        Core["浏览器内核<br/>(Chromium)"]
+    end
+
+    subgraph Server["服务端"]
+        API["BroSDK 服务器<br/>(API Service)"]
+    end
+
+    App -- "1. 获取 User Sign" --> API
+    API -- "2. 返回 JWT 令牌" --> App
+    App -- "3. 传入 User Sign 初始化" --> SDK
+    SDK --> Core
+
+    style Client fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
+    style Server fill:#fff4e1,stroke:#cc6600,stroke-width:2px
+    style App fill:#ffffff,stroke:#333,stroke-width:1.5px
+    style SDK fill:#ffffff,stroke:#333,stroke-width:1.5px
+    style Core fill:#ffffff,stroke:#333,stroke-width:1.5px
+    style API fill:#ffffff,stroke:#333,stroke-width:1.5px
 ```
 
 **核心流程**：
@@ -50,15 +63,17 @@ BroSDK 由以下核心组件组成：
 
 ## 相关资源
 
-- **官网**：https://www.brosdk.com
-- **SDK 下载**：
-  - **C++ SDK**（核心动态库）：https://github.com/browsersdk/brosdk-sdk
-  - **TypeScript SDK**（C++ SDK 的 TS 封装）：https://github.com/browsersdk/brosdk-sdk-typescript
-- **浏览器内核**：https://github.com/browsersdk/brosdk-core
-- **SDK Demo**：https://github.com/browsersdk/browser-sdk-demo
-- **服务端 SDK**：
-  - **Go 服务端 SDK**（服务端 API 封装）：https://github.com/browsersdk/brosdk-server-go
-- **SDK 参考**：[sdk-reference.md](sdk-reference.md)
+### 核心资源
+
+| 资源 | 链接 | 说明 |
+|------|------|------|
+| 🌐 官网 | [https://www.brosdk.com](https://www.brosdk.com) | 官方网站 |
+| 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk) | 核心动态库（必需） |
+| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装（需配合 C++ SDK 使用） |
+| 🔧 浏览器内核 | [github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core) | Chromium 内核 |
+| 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |
+| 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
+| 📚 SDK 参考文档 | [sdk-reference.md](sdk-reference.md) | 完整 API 文档 |
 
 ## 技术支持
 

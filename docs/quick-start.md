@@ -1,4 +1,4 @@
-# 快速开始
+﻿# 快速开始
 
 欢迎使用 BroSDK！本指南将帮助你快速上手并开始使用浏览器环境管理服务。
 
@@ -7,6 +7,7 @@
 BroSDK SDK 是一个 **C++ 编写的动态链接库**，用于调用浏览器内核。用户需要使用 **API Key** 从 BroSDK 服务器换取 **User Sign**，然后才能调用 SDK API。
 
 **核心组件**：
+
 - **SDK**：C++ 动态库（`brosdk.dll` / `brosdk.so` / `brosdk.dylib`）
 - **浏览器内核**：基于 Chromium 的定制浏览器内核
 - **服务端**：提供 API Key 认证和 User Sign 颁发
@@ -29,9 +30,12 @@ graph TD
 ### 注册流程
 
 1. 访问官网用户中心
-2. 填写注册信息（手机号或邮箱）
-3. 完成验证
-4. 设置密码（可选，支持验证码登录）
+2. 输入**手机号**或**邮箱**
+3. 获取并填写验证码
+4. 完成登录
+
+> 💡 **无需预先注册，无需设置密码**  
+> 如果是首次使用，系统会自动注册账号。后续登录只需输入手机号/邮箱 + 验证码即可。
 
 ### 账号状态
 
@@ -127,7 +131,7 @@ Content-Type: application/json
 const char *init_req =
     "{"
     "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
-    "  \"workDir\": \"C:/brosdk/data\","
+    "  \"workDir\": \"C:/brosdk/\","
     "  \"port\": 9527"
     "}";
 
@@ -137,6 +141,32 @@ sdk_handle_t handle = nullptr;
 
 int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
 ```
+
+### workDir 说明
+
+`workDir` 是 BroSDK 的工作目录，用于存储浏览器内核和环境数据。
+
+**目录结构**：
+
+```
+C:/brosdk/
+├── cores/                 # 浏览器内核目录（必需）
+│   ├── YunBrowser119-1.0.1.9
+│   ├── YunBrowser140-1.0.0.1
+│   └── ...
+├── userdata/              # Chrome 用户数据目录（自动创建）
+│   ├── env1/              # 环境 1 数据
+│   ├── env2/              # 环境 2 数据
+│   └── ...
+└── data/                  # 导出数据目录（BroSDK 自动从 userdata 导出）
+```
+
+**重要**：
+- 下载的浏览器内核需要放在 `workDir/cores/` 目录下
+- `userdata/` 和 `data/` 目录会在首次运行时自动创建
+- `userdata/` 存储 Chrome 原始用户数据
+- `data/` 是 BroSDK 从 userdata 导出的数据
+- 每个环境的数据独立存储，互不干扰
 
 ## 第五步：下载 SDK 和内核
 
@@ -154,21 +184,22 @@ int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
 
 ```plaintext
 C:/brosdk/
-├── core/                    # 浏览器内核目录
-│   ├── brosdk_core.exe     # Windows 内核
-│   ├── brosdk_core         # Linux 内核
+├── cores/                   # 浏览器内核目录（必需）
+│   ├── YunBrowser119-1.0.1.9
+│   ├── YunBrowser140-1.0.0.1
 │   └── ...
-└── data/                   # 数据目录（在初始化时指定）
-    ├── env1/              # 环境1数据
-    ├── env2/              # 环境2数据
-    └── ...
+├── userdata/                # Chrome 用户数据目录（自动创建）
+│   ├── env1/                # 环境 1 数据
+│   ├── env2/                # 环境 2 数据
+│   └── ...
+└── data/                    # 导出数据目录（BroSDK 自动从 userdata 导出）
 ```
 
 **安装步骤**：
 
-1. 下载对应平台的内核文件
-2. 解压到指定目录（例如：`C:/brosdk/core`）
-3. 在 SDK 初始化时指定工作目录
+1. 下载浏览器内核文件
+2. 解压到 `C:/brosdk/cores/` 目录
+3. 在 SDK 初始化时指定 `workDir` 为 `C:/brosdk/`
 
 ### SDK 初始化示例
 
