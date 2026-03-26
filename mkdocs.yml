@@ -16,6 +16,7 @@ copyright: Copyright &copy; 2026 BroSDK Team
 theme:
   name: material
   language: zh
+  favicon: assets/images/favicon.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -86,6 +87,7 @@ nav:
     - SDK API: api/sdk.md
   - 集成指南:
     - C 语言集成: integration/c-native.md
+    - TypeScript 集成: integration/typescript.md
   - 故障排除: troubleshooting.md
   - 部署指南: deployment.md
 

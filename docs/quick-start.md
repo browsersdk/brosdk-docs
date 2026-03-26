@@ -139,7 +139,24 @@ Content-Type: application/json
 
 ```cpp
 #include "brosdk.h"
+#include <stdio.h>
+#include <string.h>
 
+// 1. 注册回调（必须在初始化前）
+static void SDK_CALL OnResult(int32_t code, void *user_data, 
+                               const char *data, size_t len) {
+    if (sdk_is_event(code)) {
+        printf("事件 [%d]: %s\n", code, sdk_event_name(code));
+        // 10123 = Token 即将过期
+        if (code == 10123) {
+            printf("警告：Token 即将过期，需要刷新\n");
+        }
+    }
+}
+
+sdk_register_result_cb(OnResult, NULL);
+
+// 2. 初始化 SDK
 const char *init_req =
     "{"
     "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
@@ -154,9 +171,10 @@ sdk_handle_t handle = nullptr;
 int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
 
 if (rc == 0) {
-    printf("SDK 初始化成功\n");
+    printf("SDK 初始化成功：%.*s\n", (int)out_len, out);
+    sdk_free(out);  // 必须释放
 } else {
-    printf("SDK 初始化失败：%s\n", out);
+    printf("SDK 初始化失败 [%d]: %s\n", rc, sdk_error_string(rc));
 }
 ```
 
@@ -167,6 +185,11 @@ if (rc == 0) {
 | userSig | string | 是 | 从服务端获取的 User Sign |
 | workDir | string | 是 | 工作目录（内核和数据的根目录） |
 | port | integer | 是 | SDK API 服务的监听端口 |
+
+**重要**：
+- 必须先注册回调再初始化
+- `out` 输出缓冲区使用后必须调用 `sdk_free()` 释放
+- `handle` 在 C API 中实际未使用，可传 `nullptr`
 
 ---
 
@@ -192,34 +215,79 @@ const char *create_env_req =
 char *env_out = nullptr;
 size_t env_out_len = 0;
 
-int32_t rc = sdk_env_create(handle, create_env_req, strlen(create_env_req),
+int32_t rc = sdk_env_create(create_env_req, strlen(create_env_req),
                             &env_out, &env_out_len);
+
+if (rc == 0) {
+    printf("环境创建成功：%.*s\n", (int)env_out_len, env_out);
+    sdk_free(env_out);  // 必须释放
+}
 ```
 
 #### 打开浏览器
 
+**注意**：`sdk_browser_open` 直接返回状态码，无输出缓冲区。
+
 ```cpp
+// 支持批量打开多个环境
 const char *open_req =
     "{"
-    "  \"envId\": \"2034183257439866880\","
-    "  \"url\": \"https://www.example.com\""
+    "  \"envs\": [{"
+    "    \"envId\": 2034183257439866880,"
+    "    \"urls\": [\"https://www.example.com\"]"
+    "  }]"
     "}";
 
-char *open_out = nullptr;
-size_t open_out_len = 0;
+rc = sdk_browser_open(open_req, strlen(open_req));
 
-rc = sdk_open(handle, open_req, strlen(open_req), &open_out, &open_out_len);
+if (rc == 0) {
+    printf("浏览器打开成功\n");
+} else {
+    printf("浏览器打开失败 [%d]: %s\n", rc, sdk_error_string(rc));
+}
+```
+
+**批量打开示例**：
+```cpp
+const char *batch_open_req =
+    "{"
+    "  \"envs\": ["
+    "    {\"envId\": 2034183257439866880, \"urls\": [\"https://a.com\"]},"
+    "    {\"envId\": 2034183257439866881, \"urls\": [\"https://b.com\"]}"
+    "  ]"
+    "}";
+
+rc = sdk_browser_open(batch_open_req, strlen(batch_open_req));
 ```
 
 #### 关闭浏览器
 
+**注意**：`sdk_browser_close` 直接返回状态码，无输出缓冲区。
+
 ```cpp
+// 支持批量关闭多个环境
 const char *close_req =
     "{"
-    "  \"envId\": \"2034183257439866880\""
+    "  \"envs\": [2034183257439866880]"
     "}";
 
-rc = sdk_close(handle, close_req, strlen(close_req), &open_out, &open_out_len);
+rc = sdk_browser_close(close_req, strlen(close_req));
+
+if (rc == 0) {
+    printf("浏览器关闭成功\n");
+} else {
+    printf("浏览器关闭失败 [%d]: %s\n", rc, sdk_error_string(rc));
+}
+```
+
+**批量关闭示例**：
+```cpp
+const char *batch_close_req =
+    "{"
+    "  \"envs\": [2034183257439866880, 2034183257439866881]"
+    "}";
+
+rc = sdk_browser_close(batch_close_req, strlen(batch_close_req));
 ```
 
 ### 指纹配置 (Profile)

@@ -134,6 +134,216 @@ C API 中所有 `const char *data, size_t len` 参数都是 **UTF-8 编码的 JS
 
 > **Windows 注意**：SDK 分配的内存**必须**使用 `sdk_free()` 释放，不要使用主机的 `free()`，以避免跨 CRT 堆问题。
 
+## 完整示例
+
+### C 语言示例
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "brosdk.h"
+
+// 全局回调函数
+static void SDK_CALL OnResult(int32_t code, void *user_data, 
+                               const char *data, size_t len) {
+    // 检查是否为事件
+    if (sdk_is_event(code)) {
+        printf("事件 [%d]: %s - %.*s\n", code, sdk_event_name(code), (int)len, data);
+        
+        // Token 即将过期（事件 ID: 10123）
+        if (code == 10123) {
+            printf("警告：Token 即将过期，需要刷新\n");
+            // 调用服务端 API 获取新的 User Sign
+        }
+    }
+    // 检查是否为请求 ID（异步操作结果）
+    else if (sdk_is_reqid(code)) {
+        printf("请求 %d 完成：%.*s\n", code, (int)len, data);
+    }
+    // 检查是否错误
+    else if (sdk_is_error(code)) {
+        fprintf(stderr, "错误 [%d]: %s - %s\n", code, 
+                sdk_error_name(code), sdk_error_string(code));
+    }
+}
+
+// Cookie 持久化回调
+static void SDK_CALL OnCookiesStorage(const char *data, size_t len,
+                                       char **new_data, size_t *new_len,
+                                       void *user_data) {
+    // 透传模式：不修改 Cookie 数据
+    printf("收到 Cookie 数据：%.*s\n", (int)len, data);
+    
+    // 如需修改，分配新内存并写入
+    // const char *modified = "{\"modified\": true}";
+    // *new_data = (char *)sdk_malloc(strlen(modified));
+    // memcpy(*new_data, modified, strlen(modified));
+    // *new_len = strlen(modified);
+}
+
+int main(int argc, char *argv[]) {
+    // 1. 注册回调
+    sdk_register_result_cb(OnResult, NULL);
+    sdk_register_cookies_storage_cb(OnCookiesStorage, NULL);
+    
+    // 2. 初始化 SDK
+    sdk_handle_t handle = NULL;
+    const char *init_req = 
+        "{"
+        "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
+        "  \"workDir\": \"C:/brosdk/\","
+        "  \"port\": 9527"
+        "}";
+    
+    char *out_data = NULL;
+    size_t out_len = 0;
+    
+    int32_t rc = sdk_init(&handle, init_req, strlen(init_req), 
+                          &out_data, &out_len);
+    
+    if (rc == 0) {
+        printf("SDK 初始化成功：%.*s\n", (int)out_len, out_data);
+        sdk_free(out_data);  // 必须释放
+        out_data = NULL;
+    } else {
+        fprintf(stderr, "SDK 初始化失败 [%d]: %s\n", rc, sdk_error_string(rc));
+        return 1;
+    }
+    
+    // 3. 创建环境
+    const char *create_req = 
+        "{"
+        "  \"envName\": \"测试环境\","
+        "  \"customerId\": \"user_12345\","
+        "  \"proxy\": \"socks5://user:pass@proxy:1080\","
+        "  \"finger\": {"
+        "    \"system\": \"Windows 11\","
+        "    \"kernel\": \"Chrome\","
+        "    \"kernelVersion\": \"148\""
+        "  }"
+        "}";
+    
+    rc = sdk_env_create(create_req, strlen(create_req), &out_data, &out_len);
+    
+    if (rc == 0) {
+        printf("环境创建成功：%.*s\n", (int)out_len, out_data);
+        
+        // 解析响应获取 envId
+        // 假设响应为：{"envId": 2034183257439866880}
+        sdk_free(out_data);
+        out_data = NULL;
+        
+        // 4. 打开浏览器
+        const char *open_req = 
+            "{"
+            "  \"envs\": [{"
+            "    \"envId\": 2034183257439866880,"
+            "    \"urls\": [\"https://www.example.com\"]"
+            "  }]"
+            "}";
+        
+        rc = sdk_browser_open(open_req, strlen(open_req));
+        
+        if (rc == 0) {
+            printf("浏览器打开成功\n");
+        } else {
+            fprintf(stderr, "浏览器打开失败 [%d]: %s\n", rc, sdk_error_string(rc));
+        }
+        
+        // 等待一段时间...
+        printf("按任意键关闭浏览器...\n");
+        getchar();
+        
+        // 5. 关闭浏览器
+        const char *close_req = 
+            "{"
+            "  \"envs\": [2034183257439866880]"
+            "}";
+        
+        rc = sdk_browser_close(close_req, strlen(close_req));
+        
+        if (rc == 0) {
+            printf("浏览器关闭成功\n");
+        } else {
+            fprintf(stderr, "浏览器关闭失败 [%d]: %s\n", rc, sdk_error_string(rc));
+        }
+    } else {
+        fprintf(stderr, "环境创建失败 [%d]: %s\n", rc, sdk_error_string(rc));
+    }
+    
+    // 6. 关闭 SDK，释放所有资源
+    sdk_shutdown();
+    
+    return 0;
+}
+```
+
+### 编译示例（Windows）
+
+```bash
+# 使用 MSVC 编译
+cl /I. main.c brosdk.lib /Fe:demo.exe
+
+# 使用 MinGW 编译
+gcc -I. main.c -L. -lbrosdk -o demo.exe
+```
+
+### 关键点说明
+
+1. **回调注册**：必须在调用任何 API 之前注册回调
+2. **内存释放**：所有返回 `out_data` 的接口，使用后必须调用 `sdk_free()` 释放
+3. **状态码检查**：使用 `sdk_is_ok()`、`sdk_is_error()` 等辅助函数判断结果
+4. **事件处理**：在回调中检查 `sdk_is_event()` 处理 Token 过期等事件
+5. **批量操作**：`sdk_browser_open` 和 `sdk_browser_close` 支持批量传入多个 envId
+
+## 错误处理最佳实践
+
+```c
+// 在回调中统一处理错误
+static void SDK_CALL OnResult(int32_t code, void *user_data, 
+                               const char *data, size_t len) {
+    if (sdk_is_ok(code)) {
+        printf("操作成功：%.*s\n", (int)len, data);
+    }
+    else if (sdk_is_done(code)) {
+        printf("异步任务已接受，等待回调通知\n");
+    }
+    else if (sdk_is_warn(code)) {
+        printf("警告 [%d]: %s\n", code, sdk_error_string(code));
+    }
+    else if (sdk_is_event(code)) {
+        const char *eventName = sdk_event_name(code);
+        printf("事件 [%s]: %.*s\n", eventName, (int)len, data);
+        
+        // 常见事件处理
+        switch (code) {
+            case 10123:  // Token 即将过期
+                // 刷新 Token
+                break;
+            case 10124:  // Token 已过期
+                // 重新获取 User Sign
+                break;
+            case 20111:  // 浏览器打开成功
+                // 记录环境状态
+                break;
+            case 20112:  // 浏览器关闭成功
+                // 清理环境状态
+                break;
+        }
+    }
+    else if (sdk_is_reqid(code)) {
+        printf("异步请求 %d 完成：%.*s\n", code, (int)len, data);
+    }
+    else if (sdk_is_error(code)) {
+        fprintf(stderr, "错误 [%d] %s: %s\n", code, 
+                sdk_error_name(code), sdk_error_string(code));
+    }
+}
+```
+
+> **Windows 注意**：SDK 分配的内存**必须**使用 `sdk_free()` 释放，不要使用主机的 `free()`，以避免跨 CRT 堆问题。
+
 ## 环境数据管理机制
 
 SDK 以 `envId`（64 位整数）为单位管理浏览器环境数据。每个环境都有独立的 cookies、浏览历史、本地存储、IndexedDB 等持久化数据。
