@@ -44,6 +44,8 @@ theme:
   font:
     text: Roboto
     code: Roboto Mono
+  icon:
+    logo: fontawesome/solid/fingerprint
 
 # Plugins
 plugins:
