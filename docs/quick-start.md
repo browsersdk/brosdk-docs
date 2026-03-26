@@ -1,18 +1,20 @@
-﻿# 快速开始
+# 快速开始
 
 欢迎使用 BroSDK！本指南将帮助你快速上手并开始使用浏览器环境管理服务。
 
-## 架构说明
+## 简介
 
-BroSDK SDK 是一个 **C++ 编写的动态链接库**，用于调用浏览器内核。用户需要使用 **API Key** 从 BroSDK 服务器换取 **User Sign**，然后才能调用 SDK API。
+BroSDK 是一个基于 C++ 高性能浏览器环境管理和自动化平台，提供浏览器指纹管理、代理调度、环境隔离等核心功能。
 
-**核心组件**：
+### 核心组件
 
-- **SDK**：C++ 动态库（`brosdk.dll` / `brosdk.so` / `brosdk.dylib`）
-- **浏览器内核**：基于 Chromium 的定制浏览器内核
-- **服务端**：提供 API Key 认证和 User Sign 颁发
+| 组件 | 说明 |
+|------|------|
+| **SDK** | C++ 动态库（`brosdk.dll` / `brosdk.so` / `brosdk.dylib`） |
+| **浏览器内核** | 基于 Chromium 的定制浏览器内核 |
+| **服务端** | 提供 API Key 认证和 User Sign 颁发 |
 
-## 快速流程概览
+### 快速流程概览
 
 ```mermaid
 graph TD
@@ -23,164 +25,29 @@ graph TD
     E --> F[调用 SDK API 操作浏览器]
 ```
 
-## 第一步：注册账号
+---
 
-访问 [BroSDK 用户中心](https://www.brosdk.com) 完成用户注册。
+## SDK 安装
 
-### 注册流程
+### 1. 下载 SDK
 
-1. 访问官网用户中心
-2. 输入**手机号**或**邮箱**
-3. 获取并填写验证码
-4. 完成登录
+从 GitHub 下载对应平台的 SDK：
 
-> 💡 **无需预先注册，无需设置密码**  
-> 如果是首次使用，系统会自动注册账号。后续登录只需输入手机号/邮箱 + 验证码即可。
+| 平台 | 架构 | 状态 |
+|------|------|------|
+| Windows | x64 | ✅ 已发布 |
+| Linux | x64 | ✅ 已发布 |
+| macOS | x64/arm64 | 🚧 开发中 |
 
-### 账号状态
+**下载地址**：[https://github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk)
 
-- **正常**：可以使用所有功能
-- **冻结**：账号无法使用，请联系客服
+### 2. 下载浏览器内核
 
-## 第二步：创建应用
+浏览器内核需要单独下载并放置到指定目录：
 
-注册完成后，创建一个应用（APP）来获取 API Key。
+**下载地址**：[https://github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core)
 
-### 创建步骤
-
-1. 登录用户中心
-2. 进入"我的应用"
-3. 点击"创建应用"
-4. 填写应用信息：
-   - 应用名称：给你的应用起个名字
-   - 应用描述：简要描述应用用途
-5. 点击"创建"
-
-## 第三步：获取 API Key
-
-API Key 用于服务端 API 的身份认证。
-
-### 获取 API Key
-
-1. 进入"我的应用"
-2. 选择你创建的应用
-3. 在应用详情中找到 **API Key**
-4. 点击复制
-
-### API Key 安全注意事项
-
-⚠️ **重要**：
-
-- API Key 仅用于服务端调用，**永远不要在客户端代码中暴露**
-- 请妥善保管，不要泄露
-- 如需重置，可在应用详情中操作
-- 定期轮换 API Key 以提高安全性
-
-## 第四步：获取 User Sign
-
-User Sign（用户签名）是用于 SDK 初始化的 JWT 令牌，包含用户身份和权限信息。
-
-### API 接口
-
-**端点**：`POST /api/v2/browser/getUserSig`
-
-**请求头**：
-
-```http
-Authorization: Bearer YOUR_API_KEY
-Content-Type: application/json
-```
-
-**请求参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
-| customerId | string | 是 | 三方用户唯一ID |
-| duration | integer | 否 | 有效期（秒），默认1天，最大30天 |
-
-**请求示例**：
-
-```http
-POST https://api.brosdk.com/api/v2/browser/getUserSig
-Authorization: Bearer your_api_key_here
-Content-Type: application/json
-
-{
-  "customerId": "user_12345",
-  "duration": 86400
-}
-```
-
-**响应示例**：
-
-```json
-{
-  "code": 200,
-  "msg": "OK",
-  "data": {
-    "userSig": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-  }
-}
-```
-
-### User Sign 使用
-
-获取 User Sign 后，传递给 SDK 进行初始化：
-
-```cpp
-const char *init_req =
-    "{"
-    "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
-    "  \"workDir\": \"C:/brosdk/\","
-    "  \"port\": 9527"
-    "}";
-
-char *out = nullptr;
-size_t out_len = 0;
-sdk_handle_t handle = nullptr;
-
-int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
-```
-
-### workDir 说明
-
-`workDir` 是 BroSDK 的工作目录，用于存储浏览器内核和环境数据。
-
-**目录结构**：
-
-```
-C:/brosdk/
-├── cores/                 # 浏览器内核目录（必需）
-│   ├── YunBrowser119-1.0.1.9
-│   ├── YunBrowser140-1.0.0.1
-│   └── ...
-├── userdata/              # Chrome 用户数据目录（自动创建）
-│   ├── env1/              # 环境 1 数据
-│   ├── env2/              # 环境 2 数据
-│   └── ...
-└── data/                  # 导出数据目录（BroSDK 自动从 userdata 导出）
-```
-
-**重要**：
-- 下载的浏览器内核需要放在 `workDir/cores/` 目录下
-- `userdata/` 和 `data/` 目录会在首次运行时自动创建
-- `userdata/` 存储 Chrome 原始用户数据
-- `data/` 是 BroSDK 从 userdata 导出的数据
-- 每个环境的数据独立存储，互不干扰
-
-## 第五步：下载 SDK 和内核
-
-### 核心组件下载
-
-| 组件 | 说明 | 下载地址 |
-| --- | --- | --- |
-| **SDK** | C++ 动态链接库，核心调用接口 | https://github.com/browsersdk/brosdk-sdk |
-| **浏览器内核** | Chromium 定制内核，运行浏览器环境 | https://github.com/browsersdk/brosdk-core |
-| **SDK Demo** | 完整的使用示例 | https://github.com/browsersdk/browser-sdk-demo |
-| **Go 服务端 SDK** | Go 语言封装，方便服务端集成 | https://github.com/browsersdk/brosdk-server-go |
-| **TypeScript SDK** | TypeScript/Node.js封装 | https://github.com/browsersdk/brosdk-sdk-typescript |
-
-**目录结构**：
+### 3. 目录结构
 
 ```plaintext
 C:/brosdk/
@@ -195,23 +62,89 @@ C:/brosdk/
 └── data/                    # 导出数据目录（BroSDK 自动从 userdata 导出）
 ```
 
-**安装步骤**：
+**重要**：
+- 下载的浏览器内核需要放在 `workDir/cores/` 目录下
+- `userdata/` 和 `data/` 目录会在首次运行时自动创建
+- `userdata/` 存储 Chrome 原始用户数据
+- `data/` 是 BroSDK 从 userdata 导出的数据
 
-1. 下载浏览器内核文件
-2. 解压到 `C:/brosdk/cores/` 目录
-3. 在 SDK 初始化时指定 `workDir` 为 `C:/brosdk/`
+---
 
-### SDK 初始化示例
+## 身份验证配置
+
+### 第一步：注册账号
+
+访问 [BroSDK 用户中心](https://www.brosdk.com) 完成用户注册。
+
+**注册流程**：
+1. 访问官网用户中心
+2. 输入**手机号**或**邮箱**
+3. 获取并填写验证码
+4. 完成登录
+
+> 💡 **无需预先注册，无需设置密码**  
+> 如果是首次使用，系统会自动注册账号。后续登录只需输入手机号/邮箱 + 验证码即可。
+
+### 第二步：创建应用
+
+注册完成后，创建一个应用（APP）来获取 API Key：
+
+1. 登录用户中心
+2. 进入"我的应用"
+3. 点击"创建应用"
+4. 填写应用信息（名称、描述）
+5. 点击"创建"
+
+### 第三步：获取 API Key
+
+API Key 用于服务端 API 的身份认证：
+
+1. 进入"我的应用"
+2. 选择你创建的应用
+3. 在应用详情中找到 **API Key**
+4. 点击复制
+
+⚠️ **重要**：API Key 仅用于服务端调用，**永远不要在客户端代码中暴露**
+
+### 第四步：获取 User Sign
+
+User Sign 是用于 SDK 初始化的 JWT 令牌。
+
+**API 接口**：`POST /api/v2/browser/getUserSig`
+
+**请求示例**：
+```http
+POST https://api.brosdk.com/api/v2/browser/getUserSig
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+{
+  "customerId": "user_12345",
+  "duration": 86400
+}
+```
+
+**响应示例**：
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {
+    "userSig": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+### 第五步：初始化 SDK
 
 ```cpp
 #include "brosdk.h"
 
-// 初始化 SDK
 const char *init_req =
     "{"
-    "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","  // 从服务端获取的 User Sign
-    "  \"workDir\": \"C:/brosdk/data\","                             // 工作目录（数据存储）
-    "  \"port\": 9527"                                               // API 服务端口
+    "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
+    "  \"workDir\": \"C:/brosdk/\","
+    "  \"port\": 9527"
     "}";
 
 char *out = nullptr;
@@ -222,38 +155,28 @@ int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
 
 if (rc == 0) {
     printf("SDK 初始化成功\n");
-    printf("环境 ID: %s\n", out);
 } else {
-    printf("SDK 初始化失败: %s\n", out);
-    // 处理错误
+    printf("SDK 初始化失败：%s\n", out);
 }
 ```
 
-**初始化参数说明**：
+**初始化参数**：
 
 | 参数 | 类型 | 必填 | 说明 |
-| --- | --- | --- | --- |
+|------|------|------|------|
 | userSig | string | 是 | 从服务端获取的 User Sign |
-| workDir | string | 是 | 工作目录，用于存储环境数据 |
+| workDir | string | 是 | 工作目录（内核和数据的根目录） |
 | port | integer | 是 | SDK API 服务的监听端口 |
 
-## 第六步：使用 SDK API 启动环境
+---
 
-### 启动环境流程
+## 核心 API
 
-```mermaid
-graph LR
-    A[获取 User Sign] --> B[SDK 初始化]
-    B --> C[创建环境]
-    C --> D[打开浏览器]
-    D --> E[加载页面]
-    E --> F[执行操作]
-```
+### 浏览器实例 (Browser)
 
-### 创建环境并打开浏览器
+#### 创建环境
 
 ```cpp
-// 创建环境请求
 const char *create_env_req =
     "{"
     "  \"envName\": \"我的浏览器\","
@@ -271,97 +194,108 @@ size_t env_out_len = 0;
 
 int32_t rc = sdk_env_create(handle, create_env_req, strlen(create_env_req),
                             &env_out, &env_out_len);
+```
 
-if (rc == 0) {
-    printf("环境创建成功\n");
-    // 解析 env_out 获取 envId
-    
-    // 打开浏览器
-    const char *open_req =
-        "{"
-        "  \"envId\": \"2034183257439866880\","
-        "  \"url\": \"https://www.example.com\""
-        "}";
-    
-    char *open_out = nullptr;
-    size_t open_out_len = 0;
-    
-    rc = sdk_open(handle, open_req, strlen(open_req), &open_out, &open_out_len);
-    
-    if (rc == 0) {
-        printf("浏览器打开成功\n");
+#### 打开浏览器
+
+```cpp
+const char *open_req =
+    "{"
+    "  \"envId\": \"2034183257439866880\","
+    "  \"url\": \"https://www.example.com\""
+    "}";
+
+char *open_out = nullptr;
+size_t open_out_len = 0;
+
+rc = sdk_open(handle, open_req, strlen(open_req), &open_out, &open_out_len);
+```
+
+#### 关闭浏览器
+
+```cpp
+const char *close_req =
+    "{"
+    "  \"envId\": \"2034183257439866880\""
+    "}";
+
+rc = sdk_close(handle, close_req, strlen(close_req), &open_out, &open_out_len);
+```
+
+### 指纹配置 (Profile)
+
+在创建环境时配置浏览器指纹：
+
+```json
+{
+  "finger": {
+    "system": "Windows 11",
+    "kernel": "Chrome",
+    "kernelVersion": "148",
+    "platform": "Win32",
+    "language": "zh-CN",
+    "timezone": "Asia/Shanghai",
+    "screen": {
+      "width": 1920,
+      "height": 1080
     }
+  }
 }
 ```
 
-### SDK API 认证
+**支持的指纹参数**：
 
-所有 SDK API 都需要使用 User Sign 进行认证：
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| system | 操作系统 | Windows 11, macOS 14, Linux |
+| kernel | 浏览器内核 | Chrome, Firefox, Edge |
+| kernelVersion | 内核版本 | 148, 140, 119 |
+| platform | 平台标识 | Win32, MacIntel, Linux x86_64 |
+| language | 语言 | zh-CN, en-US, ja-JP |
+| timezone | 时区 | Asia/Shanghai, America/New_York |
+| screen | 屏幕分辨率 | {width: 1920, height: 1080} |
 
-```http
-Authorization: Bearer YOUR_USER_SIGN
+### 代理调度 (Proxy)
+
+支持多种代理协议：
+
+```json
+{
+  "proxy": "socks5://user:pass@proxy.example.com:1080"
+}
 ```
 
-SDK 内部会自动使用初始化时的 User Sign，无需每次请求都手动设置认证头。
+**支持的代理协议**：
+- `http://host:port`
+- `https://host:port`
+- `socks5://host:port`
+- `socks5://user:pass@host:port`
 
-### SDK API 端点
+---
 
-| 功能 | 端点 | 说明 |
-| --- | --- | --- |
-| 创建环境 | `POST /sdk/v1/env/create` | 创建新的浏览器环境 |
-| 更新环境 | `POST /sdk/v1/env/update` | 更新环境配置 |
-| 查询环境 | `POST /sdk/v1/env/page` | 查询环境列表 |
-| 销毁环境 | `POST /sdk/v1/env/destroy` | 删除环境 |
-| 打开浏览器 | `POST /sdk/v1/browser/open` | 打开指定环境 |
-| 关闭浏览器 | `POST /sdk/v1/browser/close` | 关闭浏览器 |
+## 进阶使用
 
-## 第七步：管理 User Sign
+### Token 管理
 
-### Token 过期处理
+User Sign 会在指定时间后过期（默认 1 天）。SDK 会提前通知 token 即将过期。
 
-User Sign 会在指定时间后过期（默认1天）。SDK 会提前通知你 token 即将过期。
-
-#### 过期警告事件
-
-当 User Sign 即将过期时，SDK 会触发事件 `10123`（sdk-token-expire-warning）。你应该立即调用 token 更新 API：
+#### 监听过期事件
 
 ```cpp
 static void on_result(int32_t code, void *user_data,
                       const char *data, size_t len) {
     if (sdk_is_event(code) && code == 10123) {
         printf("User Sign 即将过期，正在刷新...\n");
-        // 调用你的服务端 API 获取新的 User Sign
+        // 调用服务端 API 获取新的 User Sign
         refresh_user_sign();
     }
 }
+
+// 注册回调
+sdk_register_result_cb(on_result, nullptr);
 ```
 
 #### 更新 Token
-
-**SDK API**：`POST /sdk/v1/token/update`
-
-**请求**：
-
-```json
-{
-  "userSig": "new_user_sign_here"
-}
-```
-
-**响应**：
-
-```json
-{
-  "reqid": 1006901416,
-  "code": 0,
-  "msg": "ok",
-  "data": {
-    "eventId": 10121
-  }
-}
-```
-
-**C API**：
 
 ```cpp
 const char *update_req =
@@ -372,146 +306,76 @@ const char *update_req =
 sdk_token_update(update_req, strlen(update_req));
 ```
 
-### Token 事件说明
+### 错误处理
 
-| 事件 ID | 名称 | 说明 |
-| --- | --- | --- |
-| 10123 | sdk-token-expire-warning | Token 即将过期（需立即刷新） |
-| 10124 | sdk-token-expired | Token 已过期 |
-| 10121 | sdk-token-update-success | Token 更新成功 |
-| 10122 | sdk-token-update-failed | Token 更新失败 |
-
-## 完整示例
-
-### 服务端代码示例（Node.js）
-
-```javascript
-const axios = require('axios');
-
-// 获取 User Sign
-async function getUserSig(customerId, duration = 86400) {
-  const response = await axios.post('https://api.brosdk.com/api/v2/browser/getUserSig', {
-    customerId,
-    duration
-  }, {
-    headers: {
-      'Authorization': `Bearer ${process.env.API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  });
-  
-  return response.data.data.userSig;
-}
-
-// 使用
-getUserSig('user_12345', 86400)
-  .then(userSig => console.log('User Sign:', userSig))
-  .catch(error => console.error('Error:', error.response.data));
-```
-
-### 客户端代码示例（C++）
-
-```cpp
-#include "brosdk.h"
-
-// 注册回调
-void on_result(int32_t code, void *user_data, const char *data, size_t len) {
-    if (sdk_is_event(code)) {
-        switch (code) {
-            case 10123:
-                printf("警告：User Sign 即将过期\n");
-                // 通知应用层刷新 token
-                break;
-            case 10124:
-                printf("错误：User Sign 已过期\n");
-                break;
-        }
-    }
-}
-
-// 初始化 SDK
-void init_brosdk() {
-    // 注册回调
-    sdk_register_result_cb(on_result, nullptr);
-    
-    // 从服务端获取 User Sign
-    const char *user_sig = get_user_sig_from_server();
-    
-    // 初始化 SDK
-    const char *init_req = 
-        "{"
-        "  \"userSig\": \"" + std::string(user_sig) + "\","
-        "  \"workDir\": \"C:/brosdk/data\","
-        "  \"port\": 9527"
-        "}";
-    
-    char *out = nullptr;
-    size_t out_len = 0;
-    sdk_handle_t handle = nullptr;
-    
-    int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
-    
-    if (rc == 0) {
-        printf("SDK 初始化成功\n");
-    } else {
-        printf("SDK 初始化失败: %s\n", out);
-    }
-}
-```
-
-## 常见错误
-
-### 认证相关错误
+**常见错误码**：
 
 | 错误码 | 说明 | 解决方法 |
-| --- | --- | --- |
-| 401 | 未登录或 Token 无效/过期 | 获取新的 User Sign |
-| 10011 | 账号已注册 | 直接登录 |
-| 10012 | 密码错误 | 检查密码或使用验证码登录 |
-| 10013 | 用户名或密码无效 | 检查登录信息 |
-| 10014 | 用户不存在 | 先注册账号 |
-| 10015 | 用户被禁用 | 联系客服 |
-| 1027 | 账号不存在 | 请先注册 |
-| 1028 | 账号被冻结 | 联系客服 |
-| 1029 | 未设置密码 | 使用验证码登录 |
-
-### 应用相关错误
-
-| 错误码 | 说明 | 解决方法 |
-| --- | --- | --- |
-| 10300 | 应用不存在 | 检查应用 ID |
-| 10301 | 应用 Key 无效 | 检查 API Key |
-| 10302 | 应用状态异常 | 联系客服 |
+|--------|------|----------|
+| 401 | Token 无效/过期 | 获取新的 User Sign |
+| 10301 | API Key 无效 | 检查 API Key |
 | 10303 | 应用配额已用完 | 升级套餐或等待配额恢复 |
-
-### Token 相关错误
-
-| 错误码 | 说明 | 解决方法 |
-| --- | --- | --- |
 | 10122 | Token 更新失败 | 检查新的 User Sign 是否有效 |
-| 10124 | Token 已过期 | 获取新的 User Sign |
 
-## 最佳实践
+---
 
-1. **API Key 安全**
-   - 只在服务端使用 API Key
-   - 使用环境变量存储 API Key
-   - 定期轮换 API Key
+## 部署方案
 
-2. **User Sign 管理**
-   - 监听 token 过期事件并主动刷新
-   - 临时缓存 User Sign 以减少 API 调用
-   - 在可能的范围内提前刷新 token
+### 本地开发
 
-3. **错误处理**
-   - 优雅处理所有 API 错误
-   - 记录错误日志用于调试
-   - 实现重试机制处理临时性错误
+适用于个人开发和测试：
 
-4. **性能优化**
-   - 批量获取 User Sign 以减少请求次数
-   - 使用合适的数据有效期（duration）
-   - 避免频繁刷新 token
+1. 下载 SDK 和内核到本地
+2. 配置 `workDir` 为本地路径
+3. 直接调用 SDK API
+
+### 服务器部署
+
+适用于生产环境：
+
+1. 在服务器安装 SDK
+2. 使用环境变量存储 API Key
+3. 实现自动化的 Token 刷新机制
+4. 配置日志和监控
+
+### 容器化部署
+
+使用 Docker 部署：
+
+```dockerfile
+FROM ubuntu:22.04
+
+# 安装依赖
+RUN apt-get update && apt-get install -y \
+    libxcb1 libxkbcommon-x11-0 libxcb-icccm4 \
+    libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+    libxcb-render-util0 libxcb-xinerama0 \
+    libxcb-xfixes0 libx11-xcb1
+
+# 复制 SDK 和内核
+COPY brosdk-sdk /opt/brosdk/
+COPY brosdk-core /opt/brosdk/cores/
+
+# 设置工作目录
+ENV BROSDK_WORKDIR=/opt/brosdk/
+
+CMD ["/opt/brosdk/app"]
+```
+
+---
+
+## 相关资源
+
+| 资源 | 链接 | 说明 |
+|------|------|------|
+| 🌐 官网 | [brosdk.com](https://www.brosdk.com) | 官方网站 |
+| 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk) | 核心动态库（必需） |
+| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装 |
+| 🔧 浏览器内核 | [github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core) | Chromium 内核 |
+| 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |
+| 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
+
+---
 
 ## 下一步
 
@@ -519,12 +383,3 @@ void init_brosdk() {
 - [服务端 API 参考](api/server.md) - 查看完整的服务端 API 文档
 - [SDK API 参考](api/sdk.md) - 查看完整的 SDK API 文档
 - [原生 C 集成指南](integration/c-native.md) - 学习如何集成 SDK
-
-## 相关资源
-
-- **官网**：https://www.brosdk.com
-- **SDK 下载**：https://github.com/browsersdk/brosdk-sdk
-- **浏览器内核**：https://github.com/browsersdk/brosdk-core
-- **SDK Demo**：https://github.com/browsersdk/browser-sdk-demo
-- **Go 服务端 SDK**：https://github.com/browsersdk/brosdk-server-go
-- **TypeScript SDK**：https://github.com/browsersdk/brosdk-sdk-typescript
