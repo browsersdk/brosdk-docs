@@ -662,5 +662,5 @@ async function updateToken(newUserSig: string) {
 ## 相关资源
 
 - **TypeScript SDK**：[github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript)
-- **C++ SDK**：[github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk)
+- **C++ SDK**：[github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk/releases)
 - **koffi 文档**：[koffi.dev](https://koffi.dev/)
