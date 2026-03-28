@@ -739,6 +739,186 @@ func main() {
 
 ---
 
+## 附录
+
+### 附录 A：错误码全表
+
+| 错误码 | 名称 | 说明 |
+| --- | --- | --- |
+| `0` | OK | 操作成功 |
+| `1` | DONE | 异步任务已受理 |
+| `101` | WDIRNOTEXIST | 工作目录不存在（警告） |
+| `102` | WNOCORERESOURCE | 核心资源不可用（警告） |
+| `103` | WBRWPROCEXITED | 浏览器进程意外退出（警告） |
+| `-3000` | ENO | 内部系统错误 |
+| `-3001` | EBUSY | 资源忙 / 正在使用 |
+| `-3002` | ETIMEOUT | 操作超时 |
+| `-3003` | EINVALID | 参数或输入无效 |
+| `-3004` | ENOTFOUND | 目标资源未找到 |
+| `-3005` | EALREADY | 资源已存在 |
+| `-3006` | ENOTSUPPORTED | 操作不被支持 |
+| `-3007` | EINTERNAL | 内部故障 |
+| `-3008` | ENOSPACE | 存储 / 空间不足 |
+| `-3009` | EACCESS | 权限或访问被拒绝 |
+| `-3010` | ECONFLICT | 资源冲突 |
+| `-3011` | ERESOURCE | 资源不足 |
+| `-3012` | ENOTINITIALIZED | SDK / 组件未初始化 |
+| `-3013` | EOVERFLOW | 值或计数溢出 |
+| `-3014` | EFORMAT | 数据格式无效 |
+| `-3015` | ECANCELED | 操作被取消 |
+| `-3016` | ENOTIMPLEMENTED | 功能未实现 |
+| `-3017` | EDEADLINEEXCEEDED | 超出截止时间 |
+| `-3018` | EUNAUTHORIZED | 未授权（令牌无效 / 过期） |
+| `-3019` | EPORT_UNAVAILABLE | 端口无效或被占用 |
+| `-3020` | ENOTSTARTED | 系统未启动 |
+| `-3021` | ESVCSTARTED | 服务启动失败 |
+| `-3022` | EREQIDOVERFLOW | 请求 ID 耗尽 / 溢出 |
+| `-3023` | EOSS_NOCLIENT | 云端存储客户端未初始化 |
+| `-3024` | EOSS_DOWNLOAD | 云端下载失败 |
+| `-3025` | EOSS_UPLOAD | 云端上传失败 |
+| `-3026` | EOSS_AUTH | 云端鉴权失败 |
+| `-3027` | EOSS_NOTFOUND | 云端对象未找到 |
+| `-3028` | ECOOKIE_RESTORE | Cookie 恢复失败 |
+| `-3029` | ESTORAGE_RESTORE | Storage 恢复失败 |
+| `-3500` | EINTERNAL_ERROR | 系统严重内部错误 |
+| `-3501` | EDECRYPT | 数据解密失败 |
+| `-3502` | EHTTP_POST | HTTP POST 请求失败 |
+| `-3503` | EBRW_INVALIDENVID | envId 无效 |
+| `-3504` | EBRW_PROCKILL | 浏览器进程终止失败 |
+| `-3505` | EBRW_PROCCRE | 浏览器进程创建失败 |
+| `-3506` | EBRW_PROCEXITED | 浏览器进程意外退出 |
+| `-3507` | EBRW_NOTFOUND | 浏览器核心文件未找到 |
+| `-3508` | EINTERNAL_GENAPIREQ | 生成 API 请求失败 |
+| `-3509` | ETOKEN_INVALID | 令牌无效 |
+| `-3510` | EOSS | 云端存储操作错误 |
+| `-3511` | EWORKDIR_INVALID | 工作目录无效 |
+| `-4000` | ESDKAPI | SDK 后端 API 错误 |
+| `-4094` | EUNKNOWN | 未知错误 |
+
+### 附录 B：事件码全表
+
+#### SDK 初始化事件（10110~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `10110` | sdk-init | SDK 初始化开始 |
+| `10111` | sdk-init-success | SDK 初始化成功 |
+| `10112` | sdk-init-failed | SDK 初始化失败 |
+
+#### 令牌相关事件（10120~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `10120` | sdk-token-update | 正在更新令牌 |
+| `10121` | sdk-token-update-success | 令牌更新成功 |
+| `10122` | sdk-token-update-failed | 令牌更新失败 |
+| `10123` | sdk-token-expire-warning | **令牌即将过期**（应立即调用 `sdk_token_update`） |
+| `10124` | sdk-token-expired | 令牌已过期 |
+
+#### 浏览器打开事件（20110~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `20110` | browser-open | 浏览器打开中 |
+| `20111` | browser-open-success | 浏览器打开成功 |
+| `20112` | browser-open-failed | 浏览器打开失败 |
+| `20113` | browser-open-timeout | 浏览器打开超时 |
+
+#### 浏览器关闭事件（20140~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `20140` | browser-close | 浏览器关闭中 |
+| `20141` | browser-close-success | 浏览器关闭成功 |
+| `20142` | browser-close-failed | 浏览器关闭失败 |
+| `20143` | browser-close-timeout | 浏览器关闭超时 |
+
+#### 环境管理事件（20210~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `20210` | browser-env-create | 创建环境中 |
+| `20211` | browser-env-create-success | 创建环境成功 |
+| `20212` | browser-env-create-failed | 创建环境失败 |
+| `20220` | browser-env-update | 更新环境中 |
+| `20221` | browser-env-update-success | 更新环境成功 |
+| `20222` | browser-env-update-failed | 更新环境失败 |
+| `20230` | browser-env-page | 查询环境列表中 |
+| `20231` | browser-env-page-success | 查询环境列表成功 |
+| `20232` | browser-env-page-failed | 查询环境列表失败 |
+| `20240` | browser-env-destroy | 销毁环境中 |
+| `20241` | browser-env-destroy-success | 销毁环境成功 |
+| `20242` | browser-env-destroy-failed | 销毁环境失败 |
+
+#### Cookie / Storage 数据同步事件（20260~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `20260` | browser-cookie-upload | Cookie 上传中 |
+| `20261` | browser-cookie-upload-success | Cookie 上传成功 |
+| `20262` | browser-cookie-upload-failed | Cookie 上传失败 |
+| `20265` | browser-cookie-download | Cookie 下载中 |
+| `20266` | browser-cookie-download-success | Cookie 下载成功 |
+| `20267` | browser-cookie-download-failed | Cookie 下载失败 |
+| `20270` | browser-storage-upload | Storage 上传中 |
+| `20271` | browser-storage-upload-success | Storage 上传成功 |
+| `20272` | browser-storage-upload-failed | Storage 上传失败 |
+| `20275` | browser-storage-download | Storage 下载中 |
+| `20276` | browser-storage-download-success | Storage 下载成功 |
+| `20277` | browser-storage-download-failed | Storage 下载失败 |
+
+#### 云端存储事件（20300~）
+
+| 事件 ID | 名称 | 说明 |
+| --- | --- | --- |
+| `20300` | browser-oss | 云端操作 |
+| `20301` | browser-oss-init-success | 云端存储初始化成功 |
+| `20302` | browser-oss-init-failed | 云端存储初始化失败 |
+| `20303` | browser-oss-not-initialized | 云端存储未初始化 |
+| `20304` | browser-oss-token-updated | 云端 Token 已刷新 |
+| `20305` | browser-oss-notfound | 云端对象未找到（首次使用该环境为正常现象） |
+| `20306` | browser-oss-error | 云端存储错误 |
+| `20307` | browser-oss-cache-hit | 本地缓存命中（无需下载） |
+| `20308` | browser-oss-download | 云端下载中 |
+| `20309` | browser-oss-download-success | 云端下载成功 |
+| `20310` | browser-oss-download-failed | 云端下载失败 |
+| `20311` | browser-oss-upload | 云端上传中 |
+| `20312` | browser-oss-upload-success | 云端上传成功 |
+| `20313` | browser-oss-upload-failed | 云端上传失败 |
+
+### 附录 C：典型接入流程
+
+```mermaid
+flowchart TD
+    A[① sdk_register_result_cb<br/>注册异步回调] --> B[② sdk_register_cookies_storage_cb<br/>注册 Cookie 拦截（可选）]
+    B --> C[③ sdk_init<br/>初始化 SDK]
+    C --> D{sdk-init-success?}
+    D -->|否| E[处理初始化失败]
+    D -->|是| F[④ sdk_env_create<br/>按需创建环境]
+    F --> G[⑤ sdk_browser_open<br/>按 envId 打开浏览器]
+    G --> H{browser-open-success?}
+    H -->|否| I[处理打开失败]
+    H --> J[用户操作浏览器]
+    J --> K[⑥ sdk_browser_close<br/>关闭浏览器]
+    K --> L{browser-close-success?}
+    L -->|否| M[处理关闭失败]
+    L --> N[数据自动持久化]
+    N --> O{收到 eventId=10123?}
+    O -->|是| P[调用 sdk_token_update<br/>刷新令牌]
+    P --> F
+    O -->|否| Q{退出?}
+    Q -->|是| R[⑦ sdk_shutdown<br/>停止 SDK]
+    Q -->|否| J
+    
+    style A fill:#e3f2fd,stroke:#1976d2
+    style C fill:#e8f5e9,stroke:#388e3c
+    style G fill:#fff3e0,stroke:#f57c00
+    style K fill:#fff3e0,stroke:#f57c00
+    style R fill:#ffebee,stroke:#d32f2f
+```
+
+---
+
 ## 相关文档
 
 - [快速开始](quick-start.md) - SDK 初始化和配置
