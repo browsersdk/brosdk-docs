@@ -36,25 +36,17 @@ graph TD
 | 平台 | 架构 | 状态 |
 |------|------|------|
 | Windows | x64 | ✅ 已发布 |
-| Linux | x64 | ✅ 已发布 |
+| Linux | x64 | 🚧 开发中 |
 | macOS | x64/arm64 | 🚧 开发中 |
 
 **下载地址**：[https://github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk)
 
-### 2. 下载浏览器内核
+> 💡 **浏览器内核自动下载**：SDK 会在首次运行时自动下载并管理浏览器内核，无需手动下载。
 
-浏览器内核需要单独下载并放置到指定目录：
-
-**下载地址**：[https://github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core)
-
-### 3. 目录结构
+### 2. 目录结构
 
 ```plaintext
 C:/brosdk/
-├── cores/                   # 浏览器内核目录（必需）
-│   ├── YunBrowser119-1.0.1.9
-│   ├── YunBrowser140-1.0.0.1
-│   └── ...
 ├── userdata/                # Chrome 用户数据目录（自动创建）
 │   ├── env1/                # 环境 1 数据
 │   ├── env2/                # 环境 2 数据
@@ -63,7 +55,6 @@ C:/brosdk/
 ```
 
 **重要**：
-- 下载的浏览器内核需要放在 `workDir/cores/` 目录下
 - `userdata/` 和 `data/` 目录会在首次运行时自动创建
 - `userdata/` 存储 Chrome 原始用户数据
 - `data/` 是 BroSDK 从 userdata 导出的数据
@@ -137,298 +128,21 @@ Content-Type: application/json
 
 ### 第五步：初始化 SDK
 
-```cpp
-#include "brosdk.h"
-#include <stdio.h>
-#include <string.h>
+根据你的开发语言，选择对应的集成指南：
 
-// 1. 注册回调（必须在初始化前）
-static void SDK_CALL OnResult(int32_t code, void *user_data, 
-                               const char *data, size_t len) {
-    if (sdk_is_event(code)) {
-        printf("事件 [%d]: %s\n", code, sdk_event_name(code));
-        // 10123 = Token 即将过期
-        if (code == 10123) {
-            printf("警告：Token 即将过期，需要刷新\n");
-        }
-    }
-}
+| 语言 | 集成指南 | 说明 |
+|------|----------|------|
+| C / C++ | [C 语言集成](integration/c-native.md) | 直接调用 C API |
+| TypeScript / Electron | [TypeScript 集成](integration/typescript.md) | 通过 koffi 调用原生库 |
+| Rust / Tauri | [Rust 集成](integration/rust.md) | 通过 libloading 动态加载 |
 
-sdk_register_result_cb(OnResult, NULL);
+选择你的开发语言，查看详细的初始化代码和示例：
 
-// 2. 初始化 SDK
-const char *init_req =
-    "{"
-    "  \"userSig\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\","
-    "  \"workDir\": \"C:/brosdk/\","
-    "  \"port\": 9527"
-    "}";
+- [C 语言集成](integration/c-native.md)
+- [TypeScript 集成](integration/typescript.md)
+- [Rust 集成](integration/rust.md)
 
-char *out = nullptr;
-size_t out_len = 0;
-sdk_handle_t handle = nullptr;
-
-int32_t rc = sdk_init(&handle, init_req, strlen(init_req), &out, &out_len);
-
-if (rc == 0) {
-    printf("SDK 初始化成功：%.*s\n", (int)out_len, out);
-    sdk_free(out);  // 必须释放
-} else {
-    printf("SDK 初始化失败 [%d]: %s\n", rc, sdk_error_string(rc));
-}
-```
-
-**初始化参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| userSig | string | 是 | 从服务端获取的 User Sign |
-| workDir | string | 是 | 工作目录（内核和数据的根目录） |
-| port | integer | 是 | SDK API 服务的监听端口 |
-
-**重要**：
-- 必须先注册回调再初始化
-- `out` 输出缓冲区使用后必须调用 `sdk_free()` 释放
-- `handle` 在 C API 中实际未使用，可传 `nullptr`
-
----
-
-## 核心 API
-
-### 浏览器实例 (Browser)
-
-#### 创建环境
-
-```cpp
-const char *create_env_req =
-    "{"
-    "  \"envName\": \"我的浏览器\","
-    "  \"customerId\": \"user_12345\","
-    "  \"proxy\": \"socks5://user:pass@proxy:1080\","
-    "  \"finger\": {"
-    "    \"system\": \"Windows 11\","
-    "    \"kernel\": \"Chrome\","
-    "    \"kernelVersion\": \"148\""
-    "  }"
-    "}";
-
-char *env_out = nullptr;
-size_t env_out_len = 0;
-
-int32_t rc = sdk_env_create(create_env_req, strlen(create_env_req),
-                            &env_out, &env_out_len);
-
-if (rc == 0) {
-    printf("环境创建成功：%.*s\n", (int)env_out_len, env_out);
-    sdk_free(env_out);  // 必须释放
-}
-```
-
-#### 打开浏览器
-
-**注意**：`sdk_browser_open` 直接返回状态码，无输出缓冲区。
-
-```cpp
-// 支持批量打开多个环境
-const char *open_req =
-    "{"
-    "  \"envs\": [{"
-    "    \"envId\": 2034183257439866880,"
-    "    \"urls\": [\"https://www.example.com\"]"
-    "  }]"
-    "}";
-
-rc = sdk_browser_open(open_req, strlen(open_req));
-
-if (rc == 0) {
-    printf("浏览器打开成功\n");
-} else {
-    printf("浏览器打开失败 [%d]: %s\n", rc, sdk_error_string(rc));
-}
-```
-
-**批量打开示例**：
-```cpp
-const char *batch_open_req =
-    "{"
-    "  \"envs\": ["
-    "    {\"envId\": 2034183257439866880, \"urls\": [\"https://a.com\"]},"
-    "    {\"envId\": 2034183257439866881, \"urls\": [\"https://b.com\"]}"
-    "  ]"
-    "}";
-
-rc = sdk_browser_open(batch_open_req, strlen(batch_open_req));
-```
-
-#### 关闭浏览器
-
-**注意**：`sdk_browser_close` 直接返回状态码，无输出缓冲区。
-
-```cpp
-// 支持批量关闭多个环境
-const char *close_req =
-    "{"
-    "  \"envs\": [2034183257439866880]"
-    "}";
-
-rc = sdk_browser_close(close_req, strlen(close_req));
-
-if (rc == 0) {
-    printf("浏览器关闭成功\n");
-} else {
-    printf("浏览器关闭失败 [%d]: %s\n", rc, sdk_error_string(rc));
-}
-```
-
-**批量关闭示例**：
-```cpp
-const char *batch_close_req =
-    "{"
-    "  \"envs\": [2034183257439866880, 2034183257439866881]"
-    "}";
-
-rc = sdk_browser_close(batch_close_req, strlen(batch_close_req));
-```
-
-### 指纹配置 (Profile)
-
-在创建环境时配置浏览器指纹：
-
-```json
-{
-  "finger": {
-    "system": "Windows 11",
-    "kernel": "Chrome",
-    "kernelVersion": "148",
-    "platform": "Win32",
-    "language": "zh-CN",
-    "timezone": "Asia/Shanghai",
-    "screen": {
-      "width": 1920,
-      "height": 1080
-    }
-  }
-}
-```
-
-**支持的指纹参数**：
-
-| 参数 | 说明 | 示例 |
-|------|------|------|
-| system | 操作系统 | Windows 11, macOS 14, Linux |
-| kernel | 浏览器内核 | Chrome, Firefox, Edge |
-| kernelVersion | 内核版本 | 148, 140, 119 |
-| platform | 平台标识 | Win32, MacIntel, Linux x86_64 |
-| language | 语言 | zh-CN, en-US, ja-JP |
-| timezone | 时区 | Asia/Shanghai, America/New_York |
-| screen | 屏幕分辨率 | {width: 1920, height: 1080} |
-
-### 代理调度 (Proxy)
-
-支持多种代理协议：
-
-```json
-{
-  "proxy": "socks5://user:pass@proxy.example.com:1080"
-}
-```
-
-**支持的代理协议**：
-- `http://host:port`
-- `https://host:port`
-- `socks5://host:port`
-- `socks5://user:pass@host:port`
-
----
-
-## 进阶使用
-
-### Token 管理
-
-User Sign 会在指定时间后过期（默认 1 天）。SDK 会提前通知 token 即将过期。
-
-#### 监听过期事件
-
-```cpp
-static void on_result(int32_t code, void *user_data,
-                      const char *data, size_t len) {
-    if (sdk_is_event(code) && code == 10123) {
-        printf("User Sign 即将过期，正在刷新...\n");
-        // 调用服务端 API 获取新的 User Sign
-        refresh_user_sign();
-    }
-}
-
-// 注册回调
-sdk_register_result_cb(on_result, nullptr);
-```
-
-#### 更新 Token
-
-```cpp
-const char *update_req =
-    "{"
-    "  \"userSig\": \"new_user_sign_here\""
-    "}";
-
-sdk_token_update(update_req, strlen(update_req));
-```
-
-### 错误处理
-
-**常见错误码**：
-
-| 错误码 | 说明 | 解决方法 |
-|--------|------|----------|
-| 401 | Token 无效/过期 | 获取新的 User Sign |
-| 10301 | API Key 无效 | 检查 API Key |
-| 10303 | 应用配额已用完 | 升级套餐或等待配额恢复 |
-| 10122 | Token 更新失败 | 检查新的 User Sign 是否有效 |
-
----
-
-## 部署方案
-
-### 本地开发
-
-适用于个人开发和测试：
-
-1. 下载 SDK 和内核到本地
-2. 配置 `workDir` 为本地路径
-3. 直接调用 SDK API
-
-### 服务器部署
-
-适用于生产环境：
-
-1. 在服务器安装 SDK
-2. 使用环境变量存储 API Key
-3. 实现自动化的 Token 刷新机制
-4. 配置日志和监控
-
-### 容器化部署
-
-使用 Docker 部署：
-
-```dockerfile
-FROM ubuntu:22.04
-
-# 安装依赖
-RUN apt-get update && apt-get install -y \
-    libxcb1 libxkbcommon-x11-0 libxcb-icccm4 \
-    libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
-    libxcb-render-util0 libxcb-xinerama0 \
-    libxcb-xfixes0 libx11-xcb1
-
-# 复制 SDK 和内核
-COPY brosdk-sdk /opt/brosdk/
-COPY brosdk-core /opt/brosdk/cores/
-
-# 设置工作目录
-ENV BROSDK_WORKDIR=/opt/brosdk/
-
-CMD ["/opt/brosdk/app"]
-```
+> 💡 **快速上手**：集成指南中包含完整的初始化代码、错误处理和最佳实践，推荐先阅读再开始开发。
 
 ---
 
@@ -439,9 +153,11 @@ CMD ["/opt/brosdk/app"]
 | 🌐 官网 | [brosdk.com](https://www.brosdk.com) | 官方网站 |
 | 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk) | 核心动态库（必需） |
 | 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装 |
-| 🔧 浏览器内核 | [github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core) | Chromium 内核 |
+| 🦀 Rust SDK | [github.com/browsersdk/brosdk-sdk-rust](https://github.com/browsersdk/brosdk-sdk-rust) | C++ SDK 的 Rust 封装 |
 | 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |
 | 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
+
+> 💡 **浏览器内核**：SDK 会在首次运行时自动下载浏览器内核，无需手动下载。
 
 ---
 
@@ -449,5 +165,5 @@ CMD ["/opt/brosdk/app"]
 
 - [环境管理](user-guide/environment.md) - 学习如何创建和管理浏览器环境
 - [服务端 API 参考](api/server.md) - 查看完整的服务端 API 文档
-- [SDK API 参考](api/sdk.md) - 查看完整的 SDK API 文档
+- [SDK 参考](sdk-reference.md) - 查看完整的 SDK API 文档
 - [原生 C 集成指南](integration/c-native.md) - 学习如何集成 SDK

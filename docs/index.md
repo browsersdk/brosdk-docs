@@ -9,7 +9,7 @@ BroSDK 由以下核心组件组成：
 ```mermaid
 flowchart LR
     subgraph Client["客户端"]
-        App["用户应用<br/>(C++/Go/TS)"]
+        App["用户应用<br/>(C++/Rust/TS)"]
         SDK["BroSDK SDK<br/>(C++ DLL/SO)"]
         Core["浏览器内核<br/>(Chromium)"]
     end
@@ -55,7 +55,7 @@ flowchart LR
 ### API 参考
 
 - [服务端 API](api/server.md) - 完整的服务端 API 文档
-- [SDK API](api/sdk.md) - 完整的 SDK API 文档
+- [SDK 参考](sdk-reference.md) - 完整的 SDK API 文档（C API + HTTP API）
 
 ### 集成指南
 
@@ -69,6 +69,7 @@ flowchart LR
 |------|------|------|
 | 🌐 官网 | [https://www.brosdk.com](https://www.brosdk.com) | 官方网站 |
 | 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk) | 核心动态库（必需） |
+| 🦀 Rust SDK | [github.com/browsersdk/brosdk-sdk-rust](https://github.com/browsersdk/brosdk-sdk-rust) | C++ SDK 的 Rust 封装（需配合 C++ SDK 使用） |
 | 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装（需配合 C++ SDK 使用） |
 | 🔧 浏览器内核 | [github.com/browsersdk/brosdk-core](https://github.com/browsersdk/brosdk-core) | Chromium 内核 |
 | 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |

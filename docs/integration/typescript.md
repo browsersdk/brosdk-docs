@@ -2,6 +2,8 @@
 
 BroSDK 提供官方的 TypeScript/Node.js SDK，通过 [koffi](https://koffi.dev/) 调用原生动态库，专为 Electron 主进程设计。
 
+**Demo 项目**：[github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo)
+
 ## 环境要求
 
 | 项目 | 要求 |

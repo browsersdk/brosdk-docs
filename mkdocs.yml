@@ -79,15 +79,13 @@ markdown_extensions:
 nav:
   - 首页: index.md
   - 快速开始: quick-start.md
-  - SDK 参考: sdk-reference.md
-  - 用户指南:
-    - 环境管理: user-guide/environment.md
-  - API 参考:
-    - 服务端 API: api/server.md
-    - SDK API: api/sdk.md
+  - 环境管理: user-guide/environment.md
   - 集成指南:
     - C 语言集成: integration/c-native.md
+    - Rust 集成: integration/rust.md
     - TypeScript 集成: integration/typescript.md
+  - SDK 参考: sdk-reference.md
+  - 服务端 API: api/server.md
   - 故障排除: troubleshooting.md
   - 部署指南: deployment.md
 
