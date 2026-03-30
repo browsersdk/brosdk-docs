@@ -4,6 +4,30 @@ BroSDK 使用 `envId`（64位整数）管理浏览器环境。每个环境都有
 
 ## 创建环境
 
+!!! tip "最简创建：只需三个关键参数"
+    创建环境时，**绝大多数参数都有合理的默认值，无需手动设置**。只需关注以下三个核心参数即可：
+
+    | 参数 | 说明 |
+    |---|---|
+    | `proxy` | **代理地址**（选填）。浏览器环境的出口 IP 由此决定，直接影响语言、时区、地理位置等指纹的自动生成；不填则使用本机网络 |
+    | `finger.kernel` | **浏览器内核类型**，目前支持 `Chrome` |
+    | `finger.kernelVersion` | **内核版本号**（如 `134`、`131`）。版本越新兼容性越好，建议使用最新稳定版本 |
+
+    其他指纹参数（语言、时区、UA、Canvas、WebGL 等）均会**根据代理 IP 自动生成**，无需手动指定。
+
+### 最简示例
+
+```json
+{
+  "customerId": "user_12345",
+  "proxy": "socks5://username:password@proxy:port",
+  "finger": {
+    "kernel": "Chrome",
+    "kernelVersion": "134"
+  }
+}
+```
+
 ### 使用服务端 API
 
 **端点**：`POST /api/v2/browser/create`
@@ -14,7 +38,7 @@ BroSDK 使用 `envId`（64位整数）管理浏览器环境。每个环境都有
 Authorization: Bearer YOUR_API_KEY
 ```
 
-**请求参数**：
+**完整请求参数**：
 
 ```json
 {
@@ -27,10 +51,10 @@ Authorization: Bearer YOUR_API_KEY
   "bridgeProxy": "",
   "ipChannel": "ip2location",
   "finger": {
-    "system": "Windows 11",
     "kernel": "Chrome",
-    "kernelVersion": "148",
-    "uaVersion": "148",
+    "kernelVersion": "134",
+    "system": "Windows 11",
+    "uaVersion": "134",
     "ua": "",
     "language": [],
     "zone": "",
@@ -171,7 +195,20 @@ Authorization: Bearer YOUR_API_KEY
 Authorization: Bearer YOUR_USER_SIGN
 ```
 
-**请求参数**：与服务端 API 完全相同
+**请求参数**：与服务端 API 完全相同，最简只需传核心三个参数：
+
+```json
+{
+  "customerId": "user_12345",
+  "proxy": "socks5://username:password@proxy:port",
+  "finger": {
+    "kernel": "Chrome",
+    "kernelVersion": "134"
+  }
+}
+```
+
+**完整请求参数示例**：
 
 ```json
 {
@@ -184,10 +221,10 @@ Authorization: Bearer YOUR_USER_SIGN
   "bridgeProxy": "",
   "ipChannel": "ip2location",
   "finger": {
-    "system": "Windows 11",
     "kernel": "Chrome",
-    "kernelVersion": "148",
-    "uaVersion": "148",
+    "kernelVersion": "134",
+    "system": "Windows 11",
+    "uaVersion": "134",
     "ua": "",
     "language": [],
     "zone": "",
@@ -787,8 +824,8 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
 
 | 参数 | 类型 | 必填 | 说明 | 默认值 |
 |------|------|------|------|--------|
-| kernel | string | 是 | 浏览器内核类型：`Chrome`、`Firefox` | - |
-| kernelVersion | string | 是 | 内核版本号。Chrome 支持：107, 119, 122, 127, 131, 134, 138；Firefox 支持：130 | - |
+| kernel | string | 是 | 浏览器内核类型，目前支持：`Chrome` | - |
+| kernelVersion | string | 是 | 内核版本号。Chrome 支持：107, 119, 122, 127, 131, 134, 138 | - |
 | system | string | 否 | 操作系统：`Windows 7/8/8.1/10/11`、`MacOS 10-15`、`Android 9-13`、`IOS 14-16`、`Linux` | - |
 | ua | string | 否 | 自定义 User-Agent，为空时根据系统和浏览器版本自动生成 | 自动生成 |
 | uaVersion | string | 否 | User-Agent 版本号 | 与 kernelVersion 一致 |
