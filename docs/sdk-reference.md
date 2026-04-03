@@ -318,7 +318,112 @@ typedef void(SDK_CALL *sdk_result_cb_t)(
 );
 ```
 
+#### sdk_cookies_storage_cb_t
+
+Cookie/Storage 存储拦截回调函数类型。
+
+```c
+typedef void(SDK_CALL *sdk_cookies_storage_cb_t)(
+    const char *data,       /* [IN]  SDK 提取的 Cookie JSON 数据 */
+    size_t      len,        /* [IN]  data 字节长度               */
+    char      **new_data,   /* [OUT] 替换数据指针；NULL 表示透传 */
+    size_t     *new_len,    /* [OUT] 替换数据字节长度            */
+    void       *user_data   /* [IN]  注册时传入的用户指针        */
+);
+```
+
 ### 核心函数
+
+#### sdk_register_result_cb - 注册异步结果回调
+
+```c
+SDK_API int32_t SDK_CALL sdk_register_result_cb(
+    sdk_result_cb_t  cb,        /* [IN] 回调函数指针，不得为 NULL */
+    void            *user_data  /* [IN] 用户数据指针（每次回调原样返回）*/
+);
+```
+
+**说明**：注册全局异步通知回调。所有 SDK 异步事件（初始化完成、浏览器打开/关闭、令牌刷新、数据同步等）均通过此回调通知。**必须在调用任何其他 SDK 接口之前注册**。
+
+**参数**：
+- `cb`：回调函数指针，不得为 `NULL`
+- `user_data`：用户数据指针，原样传回回调，可为 `NULL`
+
+**返回值**：
+- `0`：注册成功
+- `< 0`：注册失败
+
+**示例**：
+```c
+static void on_result(int32_t code, void *user_data,
+                      const char *data, size_t len) {
+    if (sdk_is_reqid(code)) {
+        printf("[ReqID=%d] %.*s\n", code, (int)len, data);
+    } else if (sdk_is_event(code)) {
+        printf("[Event] %s: %.*s\n", sdk_event_name(code), (int)len, data);
+    } else if (sdk_is_error(code)) {
+        fprintf(stderr, "[Error] %s: %s\n",
+                sdk_error_name(code), sdk_error_string(code));
+    }
+}
+
+sdk_register_result_cb(on_result, NULL);
+```
+
+---
+
+#### sdk_register_cookies_storage_cb - 注册 Cookie 存储拦截回调
+
+```c
+SDK_API int32_t SDK_CALL sdk_register_cookies_storage_cb(
+    sdk_cookies_storage_cb_t  cb,        /* [IN] 拦截回调函数指针 */
+    void                     *user_data  /* [IN] 用户数据指针 */
+);
+```
+
+**说明**：注册 Cookie 存储拦截回调。当浏览器关闭后 SDK 完成 Cookie 提取时，会通过此回调将 Cookie JSON 数据传递给调用方。调用方可选择：
+- **透传**：将 `*new_data` 置 `NULL`，SDK 使用原始数据持久化
+- **替换**：通过 `sdk_malloc()` 分配替换数据写入 `*new_data` / `*new_len`，SDK 将使用替换后数据
+
+**参数**：
+- `cb`：拦截回调函数指针
+- `user_data`：用户数据指针，可为 `NULL`
+
+**返回值**：
+- `0`：注册成功
+- `< 0`：注册失败
+
+**回调实现示例**：
+```c
+/* 示例一：透传（不修改） */
+static void on_cookies_passthrough(const char *data, size_t len,
+                                    char **new_data, size_t *new_len,
+                                    void *user_data) {
+    *new_data = NULL;
+    *new_len  = 0;
+}
+
+/* 示例二：对 Cookie 数据进行二次加工 */
+static void on_cookies_transform(const char *data, size_t len,
+                                  char **new_data, size_t *new_len,
+                                  void *user_data) {
+    /* data 是 JSON 数组格式的 Cookie 数据 */
+    size_t out_size = 0;
+    char  *processed = my_process_cookies(data, len, &out_size);
+
+    /* 替换数据必须使用 sdk_malloc 分配 */
+    *new_data = (char *)sdk_malloc(out_size);
+    memcpy(*new_data, processed, out_size);
+    *new_len = out_size;
+    free(processed);
+}
+
+sdk_register_cookies_storage_cb(on_cookies_transform, NULL);
+```
+
+> **内存规则**：替换数据 `*new_data` **必须**通过 `sdk_malloc()` 分配，SDK 将自动调用 `sdk_free()` 释放。
+
+---
 
 #### sdk_init - 初始化 SDK
 
@@ -339,28 +444,94 @@ int32_t sdk_init(
 - `out_data`：输出参数，响应数据（需调用 `sdk_free()` 释放）
 - `out_len`：输出参数，响应数据长度
 
+**初始化请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| userSig | string | 是 | JWT 用户令牌，用于后端鉴权 |
+| workDir | string | 是 | SDK 工作目录（缓存、日志、内核、本地数据库存放位置） |
+| port | int | 否 | 内嵌 Web API 监听端口；0 或省略则不启动 HTTP 服务 |
+| sdkApiUrl | string | 否 | 开发者内部调试使用 |
+
 **初始化请求示例**：
 ```json
 {
-  "userSig": "eyJhbGciOiJSUzI1NiIs...",
+  "userSig": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
   "workDir": "C:/brosdk/data",
   "port": 9527
 }
 ```
 
+**响应示例（成功）**：
+```json
+{
+    "code": 0,
+    "reqId": 1309318677,
+    "type": "sdk-init-success",
+    "msg": "ok",
+    "data": {
+        "workDir": "C:/Users/Administrator/AppData/Local/BroSDK2",
+        "eventId": 10111
+    }
+}
+```
+
+**响应示例（失败）**：
+```json
+{
+    "reqId": 856525336,
+    "type": "sdk-init-failed",
+    "data": {
+        "code": -4000,
+        "msg": "401:token has invalid claims: token is expired",
+        "envId": "0",
+        "eventId": 10112
+    }
+}
+```
+
 **返回值**：
 - `0`：成功
-- `< 0`：失败（错误码）
+- `< 0`：失败（调用 `sdk_error_string(code)` 获取详情）
 
 ---
 
-#### sdk_free - 释放内存
+#### sdk_info - 获取 SDK 运行时信息
 
 ```c
-void sdk_free(void *ptr);
+SDK_API int32_t SDK_CALL sdk_info(
+    char  **out_data,  /* [OUT] 响应 JSON（需 sdk_free 释放）*/
+    size_t *out_len    /* [OUT] 响应数据字节长度              */
+);
 ```
 
-**重要**：所有 `sdk_*` 函数输出的 `out_data` 必须用 `sdk_free()` 释放。
+**说明**：获取 SDK 运行时状态快照。
+
+**响应 JSON 字段**：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| deviceId | string | 设备指纹 |
+| version | string | SDK 版本号 |
+| startupTime | int64 | 启动时间戳（Unix 秒） |
+| coresInfo | object | 已加载内核信息 |
+| netInfo | object | 本机网络信息 |
+| workDir | string | 工作目录 |
+| tokenExpiresInS | int64 | 令牌剩余有效期（秒）；0 表示未初始化 |
+| dataFullyManaged | bool | 数据托管模式：true = 全托管（云端），false = 自托管（本地） |
+
+---
+
+#### sdk_browser_info - 获取浏览器运行时信息
+
+```c
+SDK_API int32_t SDK_CALL sdk_browser_info(
+    char  **out_data,  /* [OUT] 响应 JSON（需 sdk_free 释放）*/
+    size_t *out_len    /* [OUT] 响应数据字节长度              */
+);
+```
+
+**说明**：获取当前所有浏览器实例的运行状态。
 
 ---
 
@@ -445,13 +616,119 @@ int32_t sdk_browser_open(
 );
 ```
 
+**说明**：异步打开一个或多个浏览器实例。每个 `envId` 对应独立浏览器进程与独立用户数据目录。打开时 SDK 自动从持久层恢复该环境的 Cookie 与 Storage 数据。操作结果通过回调通知。
+
+**对应 Web API**：`POST /sdk/v1/browser/open`
+
+**请求 JSON 字段**：
+
+| 字段 | 二级字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- | --- |
+| `envs` | | array | 是 | 要打开的环境列表（支持批量） |
+| | `envId` | string | 是 | 环境 ID |
+| | `args` | array | 否 | 追加的 Chromium 启动参数 |
+| | `urls` | array | 否 | 启动后自动打开的 URL |
+| | `cookies` | array | 否 | 设置当前环境的 cookies |
+| | `extensions` | array | 否 | 设置当前环境加载的扩展和透传数据 |
+
+**扩展投放方式**：
+
+在 workDir 目录，SDK 初始化一个 `extensions` 文件夹。用户将解包扩展加入该文件夹，在启动时指定。
+
+```json
+{
+    "name": "testExt1",  // 对应 ${workDir}/extensions/testExt1 目录
+    "id": "ebglcogbaklfalmoeccdjbmgfcacengf",  // 扩展 ID，用户必须预知
+    "packType": "unpack",  // 保持默认
+    "component": false,  // 保持默认
+    "data": {
+        "key1": "aGVsbG8=",  // 透传数据键值对
+        "key3": "5L2g5aW9",  // 透传数据键值对
+        "key2": "12345234634574568478asdfdgsdfg"  // 透传数据键值对
+    }
+}
+```
+
+扩展内读取透传数据：
+```javascript
+const data1 = await new Promise((resolve) =>
+  chrome.storage.local.get("key1", (r) => resolve(r))
+);
+const data2 = await new Promise((resolve) =>
+  chrome.storage.local.get("key2", (r) => resolve(r))
+);
+const data3 = await new Promise((resolve) =>
+  chrome.storage.local.get("key3", (r) => resolve(r))
+);
+```
+
 **请求示例**：
 ```json
 {
-  "envId": "2034183257439866880",
-  "url": "https://www.example.com"
+    "envs": [
+        {
+            "envId": "2037495132382564352",
+            "args": [
+                "--no-first-run",
+                "--no-default-browser-check",
+                "--disable-web-security",
+                "--remote-allow-origins=*"
+            ],
+            "urls": [
+                "https://baidu.com",
+                "https://bing.com"
+            ],
+            "extensions": [
+                {
+                    "name": "testExt1",
+                    "id": "ebglcogbaklfalmoeccdjbmgfcacengf",
+                    "packType": "unpack",
+                    "component": false,
+                    "data": {
+                        "key1": "aGVsbG8="
+                    }
+                }
+            ],
+            "cookies": [
+                {
+                    "domain": ".baidu.com",
+                    "expirationDate": 1808188306.943084,
+                    "hostOnly": false,
+                    "httpOnly": true,
+                    "name": "BDUSS_BFESS",
+                    "path": "/",
+                    "sameSite": "no_restriction",
+                    "secure": true,
+                    "session": false,
+                    "storeId": null,
+                    "value": "Xk2TVJmbGZ1WU1xOU9yVjJpMW9LZX..."
+                }
+            ]
+        }
+    ]
 }
 ```
+
+**返回值**：
+- `1`（DONE）：任务已受理
+- `< 0`：参数错误或 SDK 未初始化
+
+**回调通知体**（成功时 `eventId` = `20111`）：
+```json
+{
+    "code": 0,
+    "reqId": 1963399787,
+    "type": "browser-open-success",
+    "msg": "ok",
+    "data": {
+        "envId": "2034073783806988288",
+        "percent": 100,
+        "eventId": 20111
+    }
+}
+```
+
+> **精度提醒**：`envId` 为 64 位整数，在 JavaScript 等语言中建议以字符串传递以避免精度丢失。
 
 ---
 
@@ -467,6 +744,195 @@ int32_t sdk_browser_close(
 );
 ```
 
+**说明**：异步关闭指定环境的浏览器进程。关闭期间 SDK 自动执行 Cookie/Storage 数据的收集、压缩与持久化。操作结果通过回调通知。
+
+**对应 Web API**：`POST /sdk/v1/browser/close`
+
+**请求 JSON 字段**：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `envs` | array | 是 | 要关闭的环境 ID 列表 |
+
+**请求示例**：
+```json
+{
+  "envs": ["2028432501503954944"]
+}
+```
+
+**返回值**：`1`（DONE）任务已受理 / `< 0` 参数错误。
+
+**回调通知体**（成功时 `eventId` = `20141`）：
+```json
+{
+    "code": 0,
+    "reqId": 1577975507,
+    "type": "browser-close-success",
+    "msg": "ok",
+    "data": {
+        "envId": "2034073783806988288",
+        "eventId": 20141
+    }
+}
+```
+
+---
+
+#### sdk_env_create - 创建环境
+
+```c
+int32_t sdk_env_create(
+    sdk_handle_t  handle,
+    const char   *req,
+    size_t        req_len,
+    char        **out_data,
+    size_t       *out_len
+);
+```
+
+**说明**：同步创建浏览器环境，请求透传至后端服务。成功后返回新分配的 `envId`。
+
+**对应 Web API**：`POST /sdk/v1/env/create`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envName | string | 否 | 环境名称 |
+| customerId | string | 否 | 三方用户唯一 ID |
+| proxy | string | 否 | 代理地址（格式：`socks5://user:pass@proxy:1080`） |
+| finger | object | 否 | 浏览器指纹配置 |
+| finger.system | string | 否 | 操作系统（如：Windows 11） |
+| finger.kernel | string | 否 | 浏览器内核（如：Chrome） |
+| finger.kernelVersion | string | 否 | 内核版本（如：148） |
+
+**请求示例**：
+```json
+{
+  "envName": "我的浏览器",
+  "customerId": "user_12345",
+  "proxy": "socks5://user:pass@proxy:1080",
+  "finger": {
+    "system": "Windows 11",
+    "kernel": "Chrome",
+    "kernelVersion": "148"
+  }
+}
+```
+
+**响应示例**：
+```json
+{
+  "reqid": 1006901416,
+  "code": 0,
+  "msg": "ok",
+  "data": {
+    "envId": "2034183257439866880"
+  }
+}
+```
+
+**返回值**：`0` 成功 / `< 0` 失败。使用完毕后调用 `sdk_free(*out_data)`。
+
+---
+
+#### sdk_env_update - 更新环境
+
+```c
+int32_t sdk_env_update(
+    const char   *req,
+    size_t        req_len,
+    char        **out_data,
+    size_t       *out_len
+);
+```
+
+**说明**：同步更新现有浏览器环境配置，请求体透传至后端服务。
+
+**对应 Web API**：`POST /sdk/v1/env/update`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envId | string | 是 | 环境 ID |
+| envName | string | 否 | 环境名称 |
+| proxy | string | 否 | 代理地址 |
+| finger | object | 否 | 浏览器指纹配置 |
+
+**请求示例**：
+```json
+{
+  "envId": "2034183257439866880",
+  "envName": "更新后的名称",
+  "proxy": "socks5://newproxy:1080"
+}
+```
+
+**返回值**：`0` 成功 / `< 0` 失败。使用完毕后调用 `sdk_free(*out_data)`。
+
+---
+
+#### sdk_env_page - 查询环境列表（分页）
+
+```c
+int32_t sdk_env_page(
+    const char   *req,
+    size_t        req_len,
+    char        **out_data,
+    size_t       *out_len
+);
+```
+
+**说明**：同步查询环境列表，支持分页，请求体透传至后端服务。
+
+**对应 Web API**：`POST /sdk/v1/env/page`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| customerId | string | 否 | 三方用户 ID |
+| pageIndex | int | 否 | 页码（默认 0） |
+| pageSize | int | 否 | 每页数量（默认 20） |
+| envIds | array | 否 | 环境 ID 列表筛选 |
+
+**请求示例**：
+```json
+{
+  "customerId": "",
+  "envIds": [],
+  "pageIndex": 0,
+  "pageSize": 20
+}
+```
+
+**返回值**：`0` 成功 / `< 0` 失败。使用完毕后调用 `sdk_free(*out_data)`。
+
+---
+
+#### sdk_env_destroy - 销毁环境
+
+```c
+int32_t sdk_env_destroy(
+    const char   *req,
+    size_t        req_len,
+    char        **out_data,
+    size_t       *out_len
+);
+```
+
+**说明**：同步删除指定浏览器环境及其关联的持久化数据（Cookie / Storage）。销毁后该 `envId` 不再可用。
+
+**对应 Web API**：`POST /sdk/v1/env/destroy`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envId | string | 是 | 环境 ID |
+
 **请求示例**：
 ```json
 {
@@ -474,18 +940,149 @@ int32_t sdk_browser_close(
 }
 ```
 
+**返回值**：`0` 成功 / `< 0` 失败。使用完毕后调用 `sdk_free(*out_data)`。
+
 ---
 
-#### sdk_register_result_cb - 注册回调
+#### sdk_token_update - 刷新用户令牌
 
 ```c
-void sdk_register_result_cb(
-    sdk_result_cb_t  cb,
-    void            *user_data
+int32_t sdk_token_update(
+    const char   *req,
+    size_t        req_len
 );
 ```
 
-注册异步结果回调函数。
+**说明**：在 JWT 令牌过期前异步刷新。SDK 会在令牌即将到期时通过事件 `sdk-token-expire-warning`（`10123`）提醒调用方，收到此事件后应立即调用本接口更新令牌。
+
+**对应 Web API**：`POST /sdk/v1/token/update`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| userSig | string | 是 | 新的 JWT 用户令牌 |
+
+**请求示例**：
+```json
+{
+  "userSig": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**返回值**：`1`（DONE）任务已受理 / `< 0` 参数错误。
+
+---
+
+#### sdk_shutdown - 停止 SDK
+
+```c
+int32_t sdk_shutdown(void);
+```
+
+**说明**：同步停止 SDK：等待所有工作线程退出、关闭内嵌 HTTP 服务、释放所有资源。调用后如需再次使用 SDK，需重新调用 `sdk_init`。
+
+**对应 Web API**：`POST /sdk/v1/shutdown`
+
+**返回值**：`0` 成功 / `< 0` 失败。
+
+---
+
+### 内存与辅助函数
+
+#### sdk_malloc / sdk_free - 堆内存管理
+
+```c
+SDK_API void *SDK_CALL sdk_malloc(size_t size);
+SDK_API void  SDK_CALL sdk_free(void *ptr);
+```
+
+与 SDK 共享同一 C 运行时堆。所有 SDK 分配的输出缓冲区（`out_data`），均**必须**使用 `sdk_free()` 释放，不得使用宿主程序的 `free()`。
+
+---
+
+#### sdk_error_name / sdk_error_string - 错误码描述
+
+```c
+SDK_API const char *SDK_CALL sdk_error_name(int32_t code);
+SDK_API const char *SDK_CALL sdk_error_string(int32_t code);
+```
+
+| 函数 | 返回值 | 示例（code = -3003） |
+| --- | --- | --- |
+| `sdk_error_name` | 短名称 | `"EINVALID"` |
+| `sdk_error_string` | 可读描述 | `"invalid argument"` |
+
+> 返回值指向 SDK 内部静态字符串，**不得** `free()`。
+
+---
+
+#### sdk_event_name - 事件 ID 名称
+
+```c
+SDK_API const char *SDK_CALL sdk_event_name(int32_t evtid);
+```
+
+将事件 ID（如 `20111`）映射到可读名称（如 `"browser-open-success"`）。用于日志与事件路由。
+
+---
+
+### 状态判断函数
+
+```c
+SDK_API bool SDK_CALL sdk_is_ok(int32_t code);       /* code == 0                    */
+SDK_API bool SDK_CALL sdk_is_done(int32_t code);     /* code == 1                    */
+SDK_API bool SDK_CALL sdk_is_warn(int32_t code);      /* 100 <= code <= 255           */
+SDK_API bool SDK_CALL sdk_is_event(int32_t code);    /* 10000 <= code <= 100000      */
+SDK_API bool SDK_CALL sdk_is_reqid(int32_t code);     /* code > 100000                */
+SDK_API bool SDK_CALL sdk_is_error(int32_t code);     /* code < 0                     */
+```
+
+**推荐在回调中按以下顺序判断**：
+
+```c
+if      (sdk_is_reqid(code))  { /* 异步请求响应 */ }
+else if (sdk_is_event(code))  { /* 事件通知     */ }
+else if (sdk_is_done(code))   { /* 任务已受理   */ }
+else if (sdk_is_ok(code))     { /* 操作成功     */ }
+else if (sdk_is_warn(code))   { /* 警告         */ }
+else if (sdk_is_error(code))  { /* 错误         */ }
+```
+
+---
+
+### C++ 接口 · ISDK
+
+`brosdk.h` 在 `#ifdef __cplusplus` 保护下定义了纯虚接口类，适合 C++ 调用方：
+
+```cpp
+class ISDK {
+public:
+  virtual ~ISDK() = default;
+  virtual int32_t Info(char **, size_t *) const = 0;
+  virtual int32_t UpdateToken(const char *data, size_t len) const = 0;
+  virtual int32_t CreateEnv(const char *data, size_t len) const = 0;
+  virtual int32_t DestroyEnv(const char *data, size_t len) const = 0;
+  virtual int32_t PageEnv(const char *data, size_t len) const = 0;
+  virtual int32_t UpdateEnv(const char *data, size_t len) const = 0;
+  virtual int32_t BrowserOpen(const char *data, size_t len) const = 0;
+  virtual int32_t BrowserClose(const char *data, size_t len) const = 0;
+  virtual int32_t BrowserInfo(char **, size_t *) const = 0;
+  virtual int32_t RegisterResultCb(sdk_result_cb_t cb, void *user_data) = 0;
+  virtual int32_t RegisterCookiesStorageCb(sdk_cookies_storage_cb_t cb,
+                                           void *user_data) = 0;
+  virtual int32_t Shutdown() const = 0;
+};
+```
+
+**使用方式**：
+
+```cpp
+sdk_handle_t h = nullptr;
+sdk_init(&h, req, req_len, &out, &out_len);
+ISDK *isdk = reinterpret_cast<ISDK *>(h);
+isdk->BrowserOpen(open_req, strlen(open_req));
+```
 
 ---
 

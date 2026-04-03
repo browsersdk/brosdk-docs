@@ -108,7 +108,6 @@ Content-Type: application/json
 | customerId | string | 是 | 三方用户 ID |
 | region | string | 否 | 国家代号（如 US, CN） |
 | proxy | string | 否 | 代理配置，格式：`socks5://user:pwd@ipaddr:port` |
-| bridgeProxy | string | 否 | 桥代理配置 |
 | ipChannel | string | 否 | IP 监测渠道：`ip2location`（海外）或 `ipdata`（国内） |
 | finger | object | 是 | 浏览器指纹配置（见下方） |
 
@@ -119,7 +118,6 @@ Content-Type: application/json
   "system": "Windows 11",
   "kernel": "Chrome",
   "kernelVersion": "148",
-  "uaVersion": "148",
   "ua": "",
   "language": [],
   "zone": "",

@@ -48,13 +48,11 @@ Authorization: Bearer YOUR_API_KEY
   "customerId": "user_12345",
   "region": "US",
   "proxy": "socks5://username:password@proxy:port",
-  "bridgeProxy": "",
   "ipChannel": "ip2location",
   "finger": {
     "kernel": "Chrome",
     "kernelVersion": "134",
     "system": "Windows 11",
-    "uaVersion": "134",
     "ua": "",
     "language": [],
     "zone": "",
@@ -127,7 +125,6 @@ Authorization: Bearer YOUR_API_KEY
       "system": "Windows 11",
       "kernel": "Chrome",
       "kernelVersion": "148",
-      "uaVersion": "148",
       "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7741.0 Safari/537.36",
       "language": [],
       "zone": "",
@@ -218,13 +215,11 @@ Authorization: Bearer YOUR_USER_SIGN
   "customerId": "user_12345",
   "region": "US",
   "proxy": "socks5://username:password@proxy:port",
-  "bridgeProxy": "",
   "ipChannel": "ip2location",
   "finger": {
     "kernel": "Chrome",
     "kernelVersion": "134",
     "system": "Windows 11",
-    "uaVersion": "134",
     "ua": "",
     "language": [],
     "zone": "",
@@ -296,7 +291,6 @@ Authorization: Bearer YOUR_USER_SIGN
       "system": "Windows 11",
       "kernel": "Chrome",
       "kernelVersion": "148",
-      "uaVersion": "148",
       "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7741.0 Safari/537.36",
       "language": [],
       "zone": "",
@@ -379,7 +373,6 @@ Authorization: Bearer YOUR_API_KEY
   "serial": "",
   "region": "",
   "proxy": "",
-  "bridgeProxy": "",
   "ipChannel": "",
   "finger": {}
 }
@@ -408,7 +401,6 @@ Authorization: Bearer YOUR_USER_SIGN
   "serial": "",
   "region": "",
   "proxy": "",
-  "bridgeProxy": "",
   "ipChannel": "",
   "finger": {}
 }
@@ -430,7 +422,6 @@ Authorization: Bearer YOUR_USER_SIGN
       "system": "Windows 11",
       "kernel": "Chrome",
       "kernelVersion": "148",
-      "uaVersion": "148",
       "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7741.0 Safari/537.36",
       "language": [],
       "zone": "",
@@ -568,7 +559,6 @@ Authorization: Bearer YOUR_USER_SIGN
           "system": "Windows 11",
           "kernel": "Chrome",
           "kernelVersion": "148",
-          "uaVersion": "148",
           "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7741.0 Safari/537.36",
           "language": [],
           "zone": "",
@@ -739,8 +729,6 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
 | system.MacOS | array | macOS 系统及对应内核版本 |
 | system.Linux | array | Linux 系统及对应内核版本 |
 | platformKernelversion | array | 平台可用的内核版本 |
-| chromeUAversion | array | Chrome 浏览器 UA 版本 |
-| firefoxUAversion | array | Firefox 浏览器 UA 版本 |
 | cpu | array | CPU 核心数选项 |
 | mem | array | 内存大小选项（GB） |
 | dpi | array | 屏幕分辨率选项 |
@@ -765,7 +753,6 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
       "MacOS": [...]
     },
     "platformKernelversion": ["Chrome", "Firefox"],
-    "chromeUAversion": ["107", "119", "127", "131"],
     "cpu": [4, 8, 12, 16],
     "mem": [4, 8, 16],
     "dpi": ["1920x1080", "1366x768", "1440x900"],
@@ -792,7 +779,6 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
 | cookie | string | 否 | Cookie 数据，用于预置登录状态 | - |
 | ipChannel | string | 否 | IP监测渠道。海外代理填写 `ip2location`，国内代理填写 `ipdata` | - |
 | proxy | string | 否 | 代理配置，格式：`socks5://user:pwd@ip:port` 或 `http://ip:port` | - |
-| bridgeProxy | string | 否 | 桥代理配置，格式同 proxy | - |
 | region | string | 否 | 国家代号，当无法获取代理配置时，传此参数生成对应区域IP | - |
 
 ### 代理配置
@@ -828,7 +814,6 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
 | kernelVersion | string | 是 | 内核版本号。Chrome 支持：107, 119, 122, 127, 131, 134, 138 | - |
 | system | string | 否 | 操作系统：`Windows 7/8/8.1/10/11`、`MacOS 10-15`、`Android 9-13`、`IOS 14-16`、`Linux` | - |
 | ua | string | 否 | 自定义 User-Agent，为空时根据系统和浏览器版本自动生成 | 自动生成 |
-| uaVersion | string | 否 | User-Agent 版本号 | 与 kernelVersion 一致 |
 | language | string[] | 否 | 浏览器语言列表，如 `["zh-CN", "en-US"]`，不传会根据代理 IP 自动生成 | 自动生成 |
 | zone | string | 否 | 时区，如 `Asia/Shanghai`、`America/New_York`，不传会根据代理 IP 自动生成 | 自动生成 |
 
