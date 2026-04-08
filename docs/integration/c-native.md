@@ -493,6 +493,5 @@ SDK 内部运行 3 个常驻工作线程，使用生产者-消费者模式并行
 
 ## 下一步
 
-- [SDK API 参考](../api/sdk.md) - 完整的 SDK API 文档
 - [服务端 API 参考](../api/server.md) - 服务端 API 文档
 - [SDK Demo](https://github.com/browsersdk/browser-sdk-demo) - 完整的示例项目

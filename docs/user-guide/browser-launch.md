@@ -242,6 +242,28 @@ console.log(data);
 | `--user-agent=<ua>` | 覆盖 User-Agent |
 | `--disable-blink-features=AutomationControlled` | 隐藏自动化特征（反检测） |
 
+### macOS 专属参数
+
+| 参数 | 说明 |
+| --- | --- |
+| `--parent-bundle-identifier=<bundle-id>` | **macOS 必填**。传入宿主 App 的 Bundle Identifier（如 `com.example.myapp`）。macOS 系统要求子进程声明宿主应用身份，不传会导致浏览器无法正常启动 |
+
+**示例**：
+
+```json
+{
+  "envs": [
+    {
+      "envId": "2037495132382564352",
+      "args": [
+        "--no-first-run",
+        "--parent-bundle-identifier=com.example.myapp"
+      ]
+    }
+  ]
+}
+```
+
 ---
 
 ## 完整启动示例
@@ -449,6 +471,9 @@ await browser.close();
 
 !!! warning "端口冲突"
     批量启动多个环境时，每个环境必须使用不同的 CDP 端口，否则后启动的环境将占用相同端口导致连接失败。
+
+!!! warning "macOS 必须传入 --parent-bundle-identifier"
+    在 macOS 上启动环境时，**必须**在 `args` 中添加 `--parent-bundle-identifier=<你的 App Bundle ID>`，否则浏览器进程无法正常启动。Bundle Identifier 在 Xcode 项目的 `Info.plist` 中查看（字段 `CFBundleIdentifier`），例如 `com.example.myapp`。
 
 !!! tip "连接时机"
     建议在收到 `browser-open-success`（`eventId=20111`）事件后再发起 CDP 连接，确保浏览器进程已完全就绪。

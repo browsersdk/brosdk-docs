@@ -909,7 +909,6 @@ Content-Type: application/json
 
 ## 相关文档
 
-- [SDK API 参考](sdk.md) - 详细的 SDK API 文档
 - [原生 C 集成指南](../integration/c-native.md) - 如何集成 SDK
 - [快速开始](../quick-start.md) - 快速上手
 - [环境管理](../user-guide/environment.md) - 环境管理指南

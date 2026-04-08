@@ -264,6 +264,58 @@ curl -X POST http://localhost:9527/sdk/v1/env/create \
 | --- | --- | --- | --- |
 | envId | string | 是 | 环境 ID |
 
+### 获取浏览器运行状态
+
+**端点**：`POST /sdk/v1/browser/info`
+
+**认证**：需要（User Sign）
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envIds | array | 否 | 环境 ID 列表，传入则只查询指定环境；不传则返回所有运行中的浏览器 |
+
+**请求示例**：
+
+```bash
+# 查询所有运行中的浏览器
+curl -X POST http://localhost:9527/sdk/v1/browser/info \
+  -H "Authorization: Bearer YOUR_USER_SIGN"
+
+# 查询指定环境
+curl -X POST http://localhost:9527/sdk/v1/browser/info \
+  -H "Authorization: Bearer YOUR_USER_SIGN" \
+  -H "Content-Type: application/json" \
+  -d '{"envIds": ["2039469749536034816"]}'
+```
+
+**响应示例**：
+
+```json
+{
+  "reqid": 1191362648,
+  "code": 0,
+  "msg": "ok",
+  "data": {
+    "envs": [
+      {
+        "envId": "2039469749536034816",
+        "remoteDebuggingPort": 65534
+      }
+    ]
+  }
+}
+```
+
+**响应字段说明**：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| envs | array | 运行中的浏览器实例列表 |
+| envs[].envId | string | 环境 ID |
+| envs[].remoteDebuggingPort | int | 该实例的 `--remote-debugging-port` 端口号；未启用调试端口时为 `0` |
+
 ### 更新 User Sign
 
 **端点**：`POST /sdk/v1/token/update`
@@ -531,7 +583,51 @@ SDK_API int32_t SDK_CALL sdk_browser_info(
 );
 ```
 
-**说明**：获取当前所有浏览器实例的运行状态。
+**说明**：同步获取当前运行中的浏览器实例状态，可查询所有或指定环境的浏览器进程信息，包括调试端口。
+
+**对应 Web API**：`POST /sdk/v1/browser/info`
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envIds | array | 否 | 环境 ID 列表，传入则只查询指定环境；不传则返回所有运行中的浏览器 |
+
+**请求示例**：
+```json
+{
+  "envIds": ["2039469749536034816"]
+}
+```
+
+**响应示例**：
+```json
+{
+    "code": 0,
+    "reqId": 1191362648,
+    "type": "browser-info-success",
+    "msg": "ok",
+    "data": {
+        "envs": [
+            {
+                "envId": "2039469749536034816",
+                "remoteDebuggingPort": 65534
+            }
+        ],
+        "eventId": 20116
+    }
+}
+```
+
+**响应字段说明**：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| envs | array | 运行中的浏览器实例列表 |
+| envs[].envId | string | 环境 ID |
+| envs[].remoteDebuggingPort | int | 该实例的 `--remote-debugging-port` 端口号；未启用调试端口时为 `0` |
+
+**返回值**：`0` 成功 / `< 0` 失败。使用完毕后调用 `sdk_free(*out_data)`。
 
 ---
 
