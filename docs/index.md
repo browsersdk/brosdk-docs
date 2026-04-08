@@ -68,9 +68,9 @@ flowchart LR
 | 资源 | 链接 | 说明 |
 |------|------|------|
 | 🌐 官网 | [https://www.brosdk.com](https://www.brosdk.com) | 官方网站 |
-| 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk/releases) | 核心动态库（必需） |
-| 🦀 Rust SDK | [github.com/browsersdk/brosdk-sdk-rust](https://github.com/browsersdk/brosdk-sdk-rust) | C++ SDK 的 Rust 封装（需配合 C++ SDK 使用） |
-| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装（需配合 C++ SDK 使用） |
+| 📦 C++ SDK | [github.com/browsersdk/brosdk](https://github.com/browsersdk/brosdk/releases) | 核心动态库（必需） |
+| 🦀 Rust SDK | [github.com/browsersdk/brosdk-rust](https://github.com/browsersdk/brosdk-rust) | C++ SDK 的 Rust 封装（需配合 C++ SDK 使用） |
+| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-typescript](https://github.com/browsersdk/brosdk-typescript) | C++ SDK 的 TS 封装（需配合 C++ SDK 使用） |
 | 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |
 | 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
 | 📚 SDK 参考文档 | [sdk-reference.md](sdk-reference.md) | 完整 API 文档 |

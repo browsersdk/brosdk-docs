@@ -39,7 +39,7 @@ graph TD
 | Linux | x64 | 🚧 开发中 |
 | macOS | x64/arm64 | 🚧 开发中 |
 
-**下载地址**：[github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk/releases)
+**下载地址**：[github.com/browsersdk/brosdk](https://github.com/browsersdk/brosdk/releases)
 
 > 💡 **浏览器内核自动下载**：SDK 会在首次运行时自动下载并管理浏览器内核，无需手动下载。
 
@@ -151,9 +151,9 @@ Content-Type: application/json
 | 资源 | 链接 | 说明 |
 |------|------|------|
 | 🌐 官网 | [brosdk.com](https://www.brosdk.com) | 官方网站 |
-| 📦 C++ SDK | [github.com/browsersdk/brosdk-sdk](https://github.com/browsersdk/brosdk-sdk/releases) | 核心动态库（必需） |
-| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-sdk-typescript](https://github.com/browsersdk/brosdk-sdk-typescript) | C++ SDK 的 TS 封装 |
-| 🦀 Rust SDK | [github.com/browsersdk/brosdk-sdk-rust](https://github.com/browsersdk/brosdk-sdk-rust) | C++ SDK 的 Rust 封装 |
+| 📦 C++ SDK | [github.com/browsersdk/brosdk](https://github.com/browsersdk/brosdk/releases) | 核心动态库（必需） |
+| 📘 TypeScript SDK | [github.com/browsersdk/brosdk-typescript](https://github.com/browsersdk/brosdk-typescript) | C++ SDK 的 TS 封装 |
+| 🦀 Rust SDK | [github.com/browsersdk/brosdk-rust](https://github.com/browsersdk/brosdk-rust) | C++ SDK 的 Rust 封装 |
 | 📖 SDK Demo | [github.com/browsersdk/browser-sdk-demo](https://github.com/browsersdk/browser-sdk-demo) | 示例代码 |
 | 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
 
