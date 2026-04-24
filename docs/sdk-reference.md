@@ -1,6 +1,6 @@
 # BroSDK SDK 参考
 
-> **当前版本：v1.0.0.x　　最后更新：2026-04-24**  
+> **当前版本：v1.0.0.6　　最后更新：2026-04-24**  
 > 本文档是当前 BroSDK 的统一客户参考文档。  
 > 内容覆盖原生 C API 与内嵌本地 HTTP / WebSocket API，并按当前 `projects/brosdk/interface/brosdk.h` 与 `projects/brosdk` 实现重新校准。  
 > 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
