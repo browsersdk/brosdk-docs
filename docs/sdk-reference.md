@@ -1,21 +1,21 @@
 # BroSDK SDK 参考
 
-> **当前版本：v1.0.0.7　　最后更新：2026-05-07**
+> **当前版本：v1.0.0.7　　最后更新：2026-05-08**
 > 本文档是 BroSDK 的统一接入参考文档。
-> 内容覆盖原生 C API 与内嵌本地 HTTP / WebSocket API，以 `brosdk.h` 公开接口为准。
+> 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。
 > 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
 BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提供两种接入方式：
 
-- 原生 C API：直接加载 `brosdk.dll` / `brosdk.so` / `brosdk.dylib`
-- 内嵌 Web API：初始化时开启本地 HTTP / WebSocket 服务，通过本地接口调用
+- 动态库接口：直接加载 `brosdk.dll` / `brosdk.so` / `brosdk.dylib`，通过 `brosdk.h` 公开接口调用
+- Web API：初始化时开启本地 HTTP/WebSocket 服务，HTTP 发起请求，WebSocket 接收异步事件
 
 两种方式共享同一套浏览器生命周期、环境管理和数据持久化实现，但异步结果的交付方式不同：
 
-- C API：函数返回值 + `sdk_result_cb_t` 回调
-- HTTP API：同步响应或异步 ACK，最终结果通过 WebSocket 推送
+- 动态库接口：函数返回值 + `sdk_result_cb_t` 回调
+- Web API：同步接口直接返回；异步接口先返回 ACK，最终结果通过 WebSocket 推送
 
 ## 2. 平台支持
 
@@ -31,11 +31,11 @@ BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提供�
 
 - 所有请求体均为 UTF-8 JSON
 - 所有返回体与通知体均为 UTF-8 JSON
-- C API 中的 `len` 均为字节长度，不包含末尾 `\0`
+- 动态库接口中的 `len` 均为字节长度，不包含末尾 `\0`
 
 ### 3.2 内存管理
 
-- 所有同步 C API 返回的 `out_data`，使用后必须调用 `sdk_free()`
+- 动态库接口返回的 `out_data`，使用后必须调用 `sdk_free()`
 - 回调中的 `data` 指针只在当前回调有效，如需长期保存请立即复制
 - `sdk_cookies_storage_cb_t` 若要替换 Cookie 数据，`*new_data` 必须通过 `sdk_malloc()` 分配
 
@@ -64,13 +64,13 @@ BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提供�
 
 重要说明：
 
-- 当前异步 C API 可能返回 `CL_DONE`，也可能直接返回 `reqId`
-- 对于 HTTP 异步 ACK，顶层 `reqId` 也可能是 `0`，也可能是实际受理到的请求 ID
+- 当前异步动态库接口可能返回 `CL_DONE`，也可能直接返回 `reqId`
+- 对于 Web API 异步 ACK，顶层 `reqId` 也可能是 `0`，也可能是实际受理到的请求 ID
 - 业务接入时，应把“`sdk_is_done(code)` 或 `sdk_is_reqid(code)` 为真”都视为“异步任务已进入调度”
 
 ### 3.4 异步回调语义
 
-`sdk_result_cb_t` 是原生接入时统一的异步结果通道。
+`sdk_result_cb_t` 是动态库接入时统一的异步结果通道。
 
 - 回调第一个参数 `code` 是本次通知的粗粒度状态
 - `reqId`、`type`、`eventId` 及业务字段以 JSON body 为准
@@ -120,9 +120,9 @@ BroSDK 直接生成的同步响应结构如下：
 - `netdiag` 返回 BroSDK 网络诊断原始 JSON，结构为 `code/msg/ok/data`，不额外包含 `reqId/type`
 - 上述接口不会额外套一层 BroSDK 自己的 envelope
 
-### 3.6 异步 HTTP ACK Envelope
+### 3.6 异步 Web API ACK Envelope
 
-异步 HTTP 接口返回的是“已受理 ACK”，不是最终结果：
+异步 Web API 接口的 HTTP 响应返回的是“已受理 ACK”，不是最终结果：
 
 ```json
 {
@@ -269,7 +269,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 ### 5.1 启用方式
 
-在初始化请求中携带 `port` 即可启用本地服务：
+常见做法是在动态库 `sdk_init` 的初始化 JSON 中携带 `port`，一次完成 SDK 初始化并启用内嵌 Web API：
 
 ```json
 {
@@ -278,32 +278,95 @@ BroSDK 直接生成的同步响应结构如下：
 }
 ```
 
+兼容入口 `sdk_init_webapi(port)` 只用于先启动本地 Web API 服务；业务初始化仍需随后调用 `POST /sdk/v1/init` 并传入 `userSig`。
+
 初始化完成后：
 
-- HTTP 地址：`http://127.0.0.1:{port}`
-- WebSocket：同一服务端口，用于接收异步事件
+- Web API HTTP 地址：`http://127.0.0.1:{port}`
+- WebSocket 地址：`ws://127.0.0.1:{port}/`
+- HTTP 请求与 WebSocket 使用同一个本地 TCP 端口
+
+`port` 的当前语义：
+
+| 值 | 行为 |
+| --- | --- |
+| 不传 | 不启用内嵌 Web API |
+| `0` | SDK 自动分配本机空闲端口，实际端口在初始化响应的 `data.port` 中返回 |
+| `> 0` | SDK 尝试监听 `127.0.0.1:{port}`，端口不可用时返回 `CL_EPORT_UNAVAILABLE` |
 
 ### 5.2 认证模型
 
-内嵌本地 HTTP API 当前不依赖 `Authorization` Header。
+内嵌 Web API 当前不依赖 `Authorization` Header。
 
 当前模型如下：
 
 - `/sdk/v1/init` 在 JSON body 中携带 `userSig`
-- 后续本地 HTTP 请求复用当前已初始化的 SDK 实例
+- 后续 Web API 请求复用当前已初始化的 SDK 实例
 - `/sdk/v1/token/update` 在 JSON body 中刷新 `userSig`
 
 ### 5.3 WebSocket 使用说明
 
-调用 `browser/install`、`browser/open`、`browser/close`、`token/update` 等异步 HTTP 接口时，必须同时建立 WebSocket 连接以接收最终结果。
+WebSocket 是 Web API 的异步事件通道。调用异步接口（`browser/install`、`browser/open`、`browser/close`、`token/update`）时，HTTP 响应只返回受理 ACK；最终进度与结果通过 WebSocket 推送。
 
-当前行为：
+#### 连接地址
 
-- 浏览器核心安装、打开 / 关闭的最终通知通过 WebSocket 广播
-- 推送体与原生 C API 回调收到的 JSON 结构一致
-- 仅发 HTTP 请求而不建立 WebSocket 时，只能获取即时 ACK
+```
+ws://127.0.0.1:{port}/
+```
 
-### 5.4 `POST /sdk/v1/init`
+当前实现不区分连接 path，`/` 与任意子路径均可接受。
+
+#### 消息格式
+
+- 帧类型：UTF-8 JSON 文本帧
+- 结构与 `sdk_result_cb_t` 回调收到的 JSON 一致（参见 §3.5 / §3.7）
+- 常规 SDK 事件通常包含 `type`（事件名称）、`code`（返回码）和 `reqId` 字段；异常响应可能只在 `data` 中携带错误信息
+
+#### 请求与事件关联
+
+HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件。若 `reqId` 为 `0`，不要依赖它做精确关联，应结合 `type`、`envId` 和业务上下文判断事件归属。
+
+#### 连接生命周期
+
+| 场景 | 行为 |
+| --- | --- |
+| 未启用 Web API 前 | 本地服务未启动，TCP 连接被拒绝 |
+| 连接建立时已有浏览器运行 | SDK 立即推送一次运行状态快照，可用于恢复 UI 显示 |
+| 多个客户端并发连接 | 支持；所有 WebSocket 事件广播到全部已连接客户端 |
+| 客户端断开 | SDK 不缓冲断线期间的事件；重连后可再次收到运行状态快照 |
+| SDK shutdown | SDK 主动关闭所有 WebSocket 连接 |
+
+#### 推荐接入顺序
+
+1. `sdk_init` 返回成功
+2. 建立 WebSocket 连接，准备接收事件（可能立即收到运行状态快照）
+3. 发送 HTTP 请求，例如 `POST /sdk/v1/browser/open`
+4. HTTP 响应返回 ACK，记录 `reqId`（若不为 `0`）
+5. 通过 WebSocket 接收最终事件，如 `browser-open-success` 或 `browser-open-failed`
+
+#### 主动推送事件
+
+以下事件由 SDK 主动推送，不需要客户端先发起请求：
+
+| 事件 | 触发场景 |
+| --- | --- |
+| `sdk-token-expire-warning` | token 剩余有效期低于阈值 |
+| `sdk-token-expired` | token 已过期 |
+| `browser-close-success`（含 `closeOrigin`） | 浏览器进程意外退出或被用户手动关闭 |
+
+#### 通过 WebSocket 发送请求
+
+WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任务调度处理。当前实现所有 WebSocket 请求均视为异步，不区分同步接口语义。接入侧建议统一使用“HTTP 请求 + WebSocket 监听”的模式，语义更清晰。
+
+### 5.4 Web API 同步与异步接口
+
+| 接口 | HTTP 响应语义 | 是否需要 WebSocket |
+| --- | --- | --- |
+| `init`、`info`、`browser/info`、`netdiag` | 返回本次调用结果 | 不需要 |
+| `env/create`、`env/update`、`env/page`、`env/getinfo`、`env/destroy` | 返回后端原始结果 | 不需要 |
+| `browser/install`、`browser/open`、`browser/close`、`token/update` | 返回受理 ACK | 需要，用于接收最终结果 |
+
+### 5.5 `POST /sdk/v1/init`
 
 同步初始化 SDK。
 
@@ -313,7 +376,7 @@ BroSDK 直接生成的同步响应结构如下：
 | --- | --- | --- | --- |
 | `userSig` | string | 是 | 后端签发的用户令牌 |
 | `workDir` | string | 否 | 工作目录根路径，实际运行目录会被解析为 `workDir/appId` |
-| `port` | integer | 否 | 内嵌本地 HTTP / WS 端口，不传则不开启 Web API |
+| `port` | integer | 否 | 内嵌 Web API 端口；不传则不开启，传 `0` 自动分配空闲端口 |
 | `sdkApiUrl` | string | 否 | 覆盖 SDK 后端地址；不传则使用 SDK 内置默认地址 |
 | `debug` | bool | 否 | 开启开发者日志，默认 `false` |
 | `verbose` | bool | 否 | 开启详细日志（输出更细粒度的内部事件），默认 `false`；生产环境建议关闭 |
@@ -339,7 +402,7 @@ BroSDK 直接生成的同步响应结构如下：
 - `sdk_init` 在同一进程内是全局串行入口
 - 若已有初始化操作进行中，后续调用直接返回 `CL_WBUSY`
 
-### 5.5 `POST /sdk/v1/info`
+### 5.6 `POST /sdk/v1/info`
 
 同步获取 SDK 运行信息。
 
@@ -385,7 +448,7 @@ BroSDK 直接生成的同步响应结构如下：
 | `tokenExpiresInS` | integer | 当前 token 剩余有效秒数 |
 | `dataFullyManaged` | bool | `true` 为全托管，`false` 为半托管 |
 
-### 5.6 `POST /sdk/v1/netdiag`
+### 5.7 `POST /sdk/v1/netdiag`
 
 同步执行网络 / 代理诊断。适用于浏览器启动前验证 `proxy` 与跳板链路可达性；调用方直接获取诊断结果，无需等待 WebSocket 事件。
 
@@ -437,7 +500,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 `bridgeDiagnostics`、`urlProbe` 和 `events[].diagnostics` 是诊断明细，字段会随底层网络探测能力扩展；接入侧应优先判断顶层 `ok/code/msg`，再展示或记录明细。
 
-### 5.7 `POST /sdk/v1/browser/info`
+### 5.8 `POST /sdk/v1/browser/info`
 
 同步获取当前运行中的浏览器列表。
 
@@ -466,7 +529,7 @@ BroSDK 直接生成的同步响应结构如下：
 }
 ```
 
-### 5.8 `POST /sdk/v1/browser/install`
+### 5.9 `POST /sdk/v1/browser/install`
 
 异步安装浏览器核心资源。请求会根据初始化凭证中的核心版本列表匹配可安装包，下载 / 安装完成后 SDK 会重新加载本地核心列表。
 
@@ -512,7 +575,7 @@ BroSDK 直接生成的同步响应结构如下：
 - `browser-install-success`
 - `browser-install-failed`
 
-### 5.9 `POST /sdk/v1/browser/open`
+### 5.10 `POST /sdk/v1/browser/open`
 
 异步打开一个或多个浏览器环境。
 
@@ -658,7 +721,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 `whiteList` / `blackList` 会随环境配置写入浏览器侧配置；具体命中策略由当前浏览器核心实现决定。`extensions[].data` 与 `cookies[]` 可能包含敏感数据，接入层应限制数组长度、条目长度和字段格式，并在日志中做脱敏处理。
 
-### 5.10 `POST /sdk/v1/browser/close`
+### 5.11 `POST /sdk/v1/browser/close`
 
 异步关闭一个或多个浏览器环境。
 
@@ -739,7 +802,7 @@ BroSDK 直接生成的同步响应结构如下：
 > 即时 ACK 只表示关闭任务已被受理。  
 > 只有收到 `browser-close-success`，才表示环境已关闭完成。
 
-### 5.11 `POST /sdk/v1/token/update`
+### 5.12 `POST /sdk/v1/token/update`
 
 异步刷新 `userSig`。
 
@@ -767,7 +830,7 @@ BroSDK 直接生成的同步响应结构如下：
 }
 ```
 
-### 5.12 `POST /sdk/v1/env/create`
+### 5.13 `POST /sdk/v1/env/create`
 
 同步创建环境。
 
@@ -779,7 +842,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/create` 接口契约。
 
-### 5.13 `POST /sdk/v1/env/update`
+### 5.14 `POST /sdk/v1/env/update`
 
 同步更新环境。
 
@@ -790,7 +853,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/update` 接口契约。
 
-### 5.14 `POST /sdk/v1/env/page`
+### 5.15 `POST /sdk/v1/env/page`
 
 同步分页查询环境。
 
@@ -801,7 +864,7 @@ BroSDK 直接生成的同步响应结构如下：
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/page` 接口契约。
 
-### 5.15 `POST /sdk/v1/env/getinfo`
+### 5.16 `POST /sdk/v1/env/getinfo`
 
 同步获取单个环境的后端 `getEnvInfo` 结果。
 
@@ -827,7 +890,7 @@ BroSDK 直接生成的同步响应结构如下：
 }
 ```
 
-### 5.16 `POST /sdk/v1/env/destroy`
+### 5.17 `POST /sdk/v1/env/destroy`
 
 同步销毁环境。
 
@@ -839,17 +902,17 @@ BroSDK 直接生成的同步响应结构如下：
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/destroy` 接口契约。
 
-### 5.17 `POST /sdk/v1/shutdown`
+### 5.18 `POST /sdk/v1/shutdown`
 
 同步停止 SDK。
 
 当前行为：
 
 - 停止 SDK
-- 关闭本地 HTTP / WS 服务
+- 关闭内嵌 Web API 服务
 - 销毁当前单例
 
-## 6. 原生 C API 参考
+## 6. 动态库接口参考
 
 头文件：
 
@@ -873,7 +936,7 @@ typedef void(SDK_CALL *sdk_result_cb_t)(
     size_t len);
 ```
 
-统一异步结果回调。业务字段请以 JSON body 为准。
+动态库接口的统一异步结果回调。业务字段请以 JSON body 为准。
 
 ```c
 typedef void(SDK_CALL *sdk_cookies_storage_cb_t)(
@@ -924,7 +987,7 @@ Cookie 持久化前的拦截回调。
 | `sdk_env_getinfo` | 同步 | 返回后端 `getEnvInfo` 原始 JSON |
 | `sdk_env_destroy` | 同步 | 返回后端原始 JSON |
 
-`sdk_env_getinfo` 的请求体与 `/sdk/v1/env/getinfo` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。C++ `ISDK` 虚接口中也提供 `NetworkDiagnostics(...)` 与 `GetEnvInfo(...)`，语义与对应 C API 一致。
+`sdk_env_getinfo` 的请求体与 `/sdk/v1/env/getinfo` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。C++ `ISDK` 虚接口提供 `NetworkDiagnostics(...)` 与 `GetEnvInfo(...)`，语义与对应动态库接口一致。
 
 ### 6.5 Cookie 回调的当前行为
 
@@ -1064,9 +1127,9 @@ Storage 的链路不同：
 
 - 先调用 `sdk_register_result_cb()`，再进入异步业务流程
 - 把 `sdk_init` 当成进程内全局串行入口
-- 对于异步 C API，返回 `CL_DONE` 或 `reqId` 都表示“请求已受理”
-- Web API 中 `init`、`info`、`browser/info`、`netdiag` 与 `env/*` 为同步 HTTP；`browser/install`、`browser/open`、`browser/close`、`token/update` 为异步 ACK
-- 对于异步 HTTP 路由，必须同时建立 WebSocket
+- 对于异步动态库接口，返回 `CL_DONE` 或 `reqId` 都表示“请求已受理”
+- Web API 中 `init`、`info`、`browser/info`、`netdiag` 与 `env/*` 为同步接口；`browser/install`、`browser/open`、`browser/close`、`token/update` 为异步 ACK
+- Web API 的异步接口必须同时建立 WebSocket，用于接收最终结果
 - 浏览器可用的真正信号是 `browser-open-success`
 - 浏览器真正关闭完成的信号是 `browser-close-success`
 - `browser-close-success` 只保证本地持久化完成，不保证 OSS 上传完成
