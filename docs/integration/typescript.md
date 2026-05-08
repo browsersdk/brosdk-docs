@@ -659,6 +659,12 @@ async function updateToken(newUserSig: string) {
 4. **动态库路径**：确保动态库按正确目录结构放置，否则 SDK 无法加载
 5. **Electron 打包**：打包后动态库路径基于 `process.resourcesPath`，需确保打包配置正确
 
+## 完整事件码与错误码
+
+完整的回调事件码（~90 个事件）和错误码表请参阅：
+
+👉 [SDK 回调机制](./callback.md)
+
 ## 相关资源
 
 - **TypeScript SDK**：[github.com/browsersdk/brosdk-typescript](https://github.com/browsersdk/brosdk-typescript)

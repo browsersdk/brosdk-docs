@@ -80,9 +80,11 @@ nav:
   - 首页: index.md
   - 快速开始: quick-start.md
   - 用户指南:
+    - APP 配置: user-guide/app-config.md
     - 环境管理: user-guide/environment.md
     - 启动参数与 CDP: user-guide/browser-launch.md
   - 集成指南:
+    - SDK 回调机制: integration/callback.md
     - C 语言集成: integration/c-native.md
     - Rust 集成: integration/rust.md
     - TypeScript 集成: integration/typescript.md

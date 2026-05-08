@@ -51,6 +51,7 @@ flowchart LR
 
 - [快速开始](quick-start.md) - 5 分钟快速上手 BroSDK
 - [环境管理](user-guide/environment.md) - 管理浏览器环境
+- [APP 配置](user-guide/app-config.md) - 创建应用并配置内核、存储和访问策略
 
 ### API 参考
 

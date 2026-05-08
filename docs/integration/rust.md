@@ -298,6 +298,12 @@ cargo build --release
 3. **内存管理**：Rust SDK 自动处理内存管理，无需手动释放
 4. **线程安全**：SDK 内部线程触发回调时，会自动调度回主线程
 
+## 完整事件码与错误码
+
+完整的回调事件码（~90 个事件）和错误码表请参阅：
+
+👉 [SDK 回调机制](./callback.md)
+
 ## 相关资源
 
 - **Rust SDK**：[github.com/browsersdk/brosdk-rust](https://github.com/browsersdk/brosdk-rust)
