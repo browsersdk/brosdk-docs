@@ -891,7 +891,7 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/kernelIdList" \
 | pageSize | int | 否 | 每页条数，默认 10 |
 | platform | string | 否 | 按平台筛选，如 `windows`、`linux`、`macos`，来自 `/platformList` |
 | arch | string | 否 | 按架构筛选，如 `x86_64`、`arm64`，来自 `/archList` |
-| kernelId | string | 否 | 按内核类型筛选，如 `chrome` |
+| kernelId | string | 否 | 按内核类型筛选，如 `chrome`，来自 `/kernelIdList` |
 | majorVersion | string | 否 | 按主版本号筛选，如 `134`、`131` |
 | status | int | 否 | 状态筛选：`1`=已发布，`2`=隐藏 |
 
