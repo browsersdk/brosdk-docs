@@ -841,6 +841,40 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/archList" \
 
 ---
 
+### 获取内核类型列表
+
+**端点**：`GET /api/v2/browser/kernelIdList`
+
+**认证**：需要（API Key）
+
+返回当前支持的内核类型列表，结果为 `map[string]string`，key 为内核标识，value 为内核显示名称。可用于内核版本查询时的 `kernelId` 筛选参数。
+
+**请求示例**：
+
+```bash
+curl -X GET "https://api.brosdk.com/api/v2/browser/kernelIdList" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {
+    "chrome": "Chrome"
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | int | 状态码，200 为成功 |
+| data | object | key 为内核标识（用于内核版本查询的 `kernelId` 参数），value 为展示名称 |
+
+---
+
 ### 获取内核版本列表
 
 **端点**：`POST /api/v2/browser/kernelList`
@@ -937,40 +971,6 @@ curl -X POST "https://api.brosdk.com/api/v2/sdk/kernel-version/page" \
 | currentPage | int | 当前页码 |
 
 > 💡 **提示**：创建环境时，`finger.kernel` 和 `finger.kernelVersion` 的有效组合从此接口的 `kernel` 和 `kernelVersion` 字段获取；`canCreate` 为 `true` 的版本才可用于创建环境。
-
----
-
-### 获取内核类型列表
-
-**端点**：`GET /api/v2/browser/kernelIdList`
-
-**认证**：需要（API Key）
-
-返回当前支持的内核类型列表，结果为 `map[string]string`，key 为内核标识，value 为内核显示名称。可用于内核版本查询时的 `kernelId` 筛选参数。
-
-**请求示例**：
-
-```bash
-curl -X GET "https://api.brosdk.com/api/v2/browser/kernelIdList" \
-  -H "Authorization: Bearer YOUR_API_KEY"
-```
-
-**响应示例**：
-
-```json
-{
-  "code": 200,
-  "msg": "OK",
-  "data": {
-    "chrome": "Chrome"
-  }
-}
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| code | int | 状态码，200 为成功 |
-| data | object | key 为内核标识（用于内核版本查询的 `kernelId` 参数），value 为展示名称 |
 
 ---
 
