@@ -1,6 +1,6 @@
 # BroSDK SDK 参考
 
-> **当前版本：v1.0.0.7　　最后更新：2026-05-08** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
+> **当前版本：v1.0.0.7　　最后更新：2026-05-14** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
@@ -149,6 +149,8 @@ BroSDK 直接生成的同步响应结构如下：
 *   `env/create`、`env/update`、`env/page`、`env/getinfo`、`env/destroy` 为后端原始 JSON 透传
     
 *   `netdiag` 返回 BroSDK 网络诊断原始 JSON，结构为 `code/msg/ok/data`，不额外包含 `reqId/type`
+    
+*   `browser/cleanup` 返回 BroSDK 清理结果原始 JSON，结构为 `code/msg/data`，不额外包含 `reqId/type`
     
 *   上述接口不会额外套一层 BroSDK 自己的 envelope
     
@@ -443,6 +445,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | 接口 | HTTP 响应语义 | 是否需要 WebSocket |
 | --- | --- | --- |
 | `init`、`info`、`browser/info`、`netdiag` | 返回本次调用结果 | 不需要 |
+| `browser/cleanup` | 返回本次清理结果 | 不需要 |
 | `env/create`、`env/update`、`env/page`、`env/getinfo`、`env/destroy` | 返回后端原始结果 | 不需要 |
 | `browser/install`、`browser/open`、`browser/close`、`token/update` | 返回受理 ACK | 需要，用于接收最终结果 |
 
@@ -971,7 +974,80 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 > 即时 ACK 只表示关闭任务已被受理。   只有收到 `browser-close-success`，才表示环境已关闭完成。
 
-### 5.12 `POST /sdk/v1/token/update`
+### 5.12 `POST /sdk/v1/browser/cleanup`
+
+同步清理指定环境的 `userdatadir` 缓存。
+
+请求字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `envs` | array | 是 | 要清理缓存的环境 ID 列表，最多 128 个 |
+
+`envs[ ]` 支持：
+
+*   字符串环境 ID
+    
+*   数字环境 ID
+    
+
+请求示例：
+
+```json
+{
+  "envs": [
+    "2041415694746128384",
+    "2041415694746128385"
+  ]
+}
+
+```
+
+成功响应示例：
+
+```json
+{
+  "code": 0,
+  "msg": "ok",
+  "data": {
+    "deleted": 1,
+    "notFound": 1,
+    "busy": 0,
+    "invalid": 0,
+    "failed": 0,
+    "results": [
+      {
+        "envId": "2041415694746128384",
+        "code": 0,
+        "msg": "ok",
+        "status": "deleted",
+        "userDataDir": "C:/BroSDK/1234567890/userdata/2041415694746128384"
+      },
+      {
+        "envId": "2041415694746128385",
+        "code": 0,
+        "msg": "ok",
+        "status": "not_found",
+        "userDataDir": "C:/BroSDK/1234567890/userdata/2041415694746128385"
+      }
+    ]
+  }
+}
+
+```
+
+关键语义：
+
+*   `browser/cleanup` 只删除指定环境的本地 `userdatadir` 缓存，不销毁后端环境记录
+    
+*   如果指定环境正在运行，或仍处于 `browser/open` / `browser/close` 队列中，该环境返回 `CL_EBUSY`，结果项状态为 `busy`
+    
+*   如果请求中任一环境忙碌，顶层 `code` 返回 `CL_EBUSY`；如果存在非法环境 ID，顶层 `code` 返回 `CL_EINVALID`
+    
+*   `not_found` 表示该环境本地缓存目录不存在，按清理完成处理
+    
+
+### 5.13 `POST /sdk/v1/token/update`
 
 异步刷新 `userSig`。
 
@@ -1000,7 +1076,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 ```
 
-### 5.13 `POST /sdk/v1/env/create`
+### 5.14 `POST /sdk/v1/env/create`
 
 同步创建环境。
 
@@ -1015,7 +1091,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/create` 接口契约。
 
-### 5.14 `POST /sdk/v1/env/update`
+### 5.15 `POST /sdk/v1/env/update`
 
 同步更新环境。
 
@@ -1028,7 +1104,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/update` 接口契约。
 
-### 5.15 `POST /sdk/v1/env/page`
+### 5.16 `POST /sdk/v1/env/page`
 
 同步分页查询环境。
 
@@ -1041,7 +1117,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/page` 接口契约。
 
-### 5.16 `POST /sdk/v1/env/getinfo`
+### 5.17 `POST /sdk/v1/env/getinfo`
 
 同步获取单个环境的后端 `getEnvInfo` 结果。
 
@@ -1071,7 +1147,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 ```
 
-### 5.17 `POST /sdk/v1/env/destroy`
+### 5.18 `POST /sdk/v1/env/destroy`
 
 同步销毁环境。
 
@@ -1086,7 +1162,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/destroy` 接口契约。
 
-### 5.18 `POST /sdk/v1/shutdown`
+### 5.19 `POST /sdk/v1/shutdown`
 
 同步停止 SDK。
 
@@ -1129,6 +1205,22 @@ typedef void(SDK_CALL *sdk_result_cb_t)(
 动态库接口的统一异步结果回调。业务字段请以 JSON body 为准。
 
 ```c
+typedef enum {
+    SDK_LOG_TYPE_UNKNOWN = 0,
+    SDK_LOG_TYPE_LOCAL = 1,
+    SDK_LOG_TYPE_SERVER = 2,
+} sdk_log_type_t;
+
+typedef void(SDK_CALL *sdk_log_cb_t)(
+    sdk_log_type_t type,
+    const char *data,
+    size_t len);
+
+```
+
+SDK 日志回调。`SDK_LOG_TYPE_LOCAL` 表示本地 SDK 日志行；`SDK_LOG_TYPE_SERVER` 表示已进入 sdk-server 上传队列的结构化日志 JSON。回调中的 `data` 只在当前回调有效。
+
+```c
 typedef void(SDK_CALL *sdk_cookies_storage_cb_t)(
     const char *data,
     size_t len,
@@ -1145,6 +1237,7 @@ Cookie 持久化前的拦截回调。
 | 函数 | 模式 | 说明 |
 | --- | --- | --- |
 | `sdk_register_result_cb` | 同步 | 注册全局异步回调 |
+| `sdk_register_log_cb` | 同步 | 注册 SDK 日志回调，传 `NULL` 可关闭 |
 | `sdk_register_cookies_storage_cb` | 同步 | 注册 Cookie 拦截回调 |
 | `sdk_init_cpp` | 同步 | 仅获取 SDK 句柄，不执行初始化 |
 | `sdk_init` | 同步 | 初始化 SDK，返回堆分配的 JSON 响应 |
@@ -1165,8 +1258,11 @@ Cookie 持久化前的拦截回调。
 | `sdk_browser_install` | 异步 | 安装浏览器核心资源 |
 | `sdk_browser_open` | 异步 | 最终 ready 信号是 `browser-open-success` |
 | `sdk_browser_close` | 异步 | 最终关闭完成信号是 `browser-close-success` |
+| `sdk_browser_cleanup` | 同步 | 清理指定环境的 `userdatadir` 缓存，返回清理结果 JSON |
 
 `sdk_browser_install` 的请求体与 `/sdk/v1/browser/install` 一致，必须包含 `cores[ ].major`。进度和最终结果通过 `sdk_result_cb_t` 回调返回。
+
+`sdk_browser_cleanup` 的请求体与 `/sdk/v1/browser/cleanup` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。运行中或正在打开/关闭队列中的环境会返回 `CL_EBUSY`，结果项状态为 `busy`。
 
 ### 6.4 环境接口
 
@@ -1362,7 +1458,7 @@ Storage 的链路不同：
     
 *   对于异步动态库接口，返回 `CL_DONE` 或 `reqId` 都表示“请求已受理”
     
-*   Web API 中 `init`、`info`、`browser/info`、`netdiag` 与 `env/*` 为同步接口；`browser/install`、`browser/open`、`browser/close`、`token/update` 为异步 ACK
+*   Web API 中 `init`、`info`、`browser/info`、`netdiag`、`browser/cleanup` 与 `env/*` 为同步接口；`browser/install`、`browser/open`、`browser/close`、`token/update` 为异步 ACK
     
 *   Web API 的异步接口必须同时建立 WebSocket，用于接收最终结果
     
@@ -1374,7 +1470,7 @@ Storage 的链路不同：
     
 *   如果浏览器是用户手动关闭或进程自行退出，仍可能上报 `browser-close-success`，但 `data.closeReason*` 会说明真实原因
     
-*   `env/*` 接口和 `init/info/browser/*` 的回包包装方式不同，前者是后端原始 JSON 透传；`netdiag` 也是同步原始诊断 JSON
+*   `env/*` 接口和 `init/info/browser/*` 的回包包装方式不同，前者是后端原始 JSON 透传；`netdiag` 也是同步原始诊断 JSON；`browser/cleanup` 返回同步清理结果 JSON
     
 *   `env/create`、`env/update`、`env/page`、`env/destroy` 的请求参数与响应字段请以后端对接文档为准，SDK 文档不重复维护
     
@@ -1414,6 +1510,9 @@ Storage 的链路不同：
 | `20140` | `browser-close` |
 | `20141` | `browser-close-success` |
 | `20142` | `browser-close-failed` |
+| `20150` | `browser-cleanup` |
+| `20151` | `browser-cleanup-success` |
+| `20152` | `browser-cleanup-failed` |
 | `20210` | `browser-env-create` |
 | `20211` | `browser-env-create-success` |
 | `20212` | `browser-env-create-failed` |
@@ -1451,6 +1550,7 @@ Storage 的链路不同：
 | `1` | `CL_DONE` | 异步任务已受理 |
 | `103` | `CL_WBRWPROCEXITED` | 浏览器进程自行退出；常见于手动关窗或运行中异常退出 |
 | `104` | `CL_WBUSY` | 资源忙，另一个初始化操作正在进行 |
+| `-3001` | `CL_EBUSY` | 资源忙；例如清理环境缓存时目标环境仍在运行或仍在打开/关闭队列中 |
 | `-3002` | `CL_ETIMEOUT` | 超时 |
 | `-3003` | `CL_EINVALID` | 参数错误 |
 | `-3005` | `CL_EALREADY` | 已存在或重复初始化；进程内 SDK 单例已运行，无需再次初始化 |
