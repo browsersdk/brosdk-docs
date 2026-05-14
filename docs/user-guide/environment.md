@@ -768,6 +768,178 @@ curl -X GET "https://api.brosdk.com/api/v2/browser/getUiFingerList" \
 
 ---
 
+### 获取支持平台列表
+
+**端点**：`GET /api/v2/browser/platformList`
+
+**认证**：需要（API Key）
+
+返回当前内核支持的操作系统平台列表，结果为 `map[string]string`，key 为平台标识，value 为平台显示名称。创建环境时 `finger.system` 可选平台范围参见此接口。
+
+**请求示例**：
+
+```bash
+curl -X GET "https://api.brosdk.com/api/v2/browser/platformList" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {
+    "windows": "Windows",
+    "macos": "MacOS",
+    "linux": "Linux",
+    "android": "Android"
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | int | 状态码，200 为成功 |
+| data | object | key 为平台标识（用于内核查询的 `platform` 参数），value 为展示名称 |
+
+---
+
+### 获取支持架构列表
+
+**端点**：`GET /api/v2/browser/archList`
+
+**认证**：需要（API Key）
+
+返回当前内核支持的 CPU 架构列表，结果为 `map[string]string`，key 为架构标识，value 为架构显示名称。可用于内核版本查询时的 `arch` 筛选参数。
+
+**请求示例**：
+
+```bash
+curl -X GET "https://api.brosdk.com/api/v2/browser/archList" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {
+    "x86_64": "x86_64",
+    "arm64": "arm64",
+    "i386": "i386"
+  }
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| code | int | 状态码，200 为成功 |
+| data | object | key 为架构标识（用于内核查询的 `arch` 参数），value 为展示名称 |
+
+---
+
+### 获取内核版本列表
+
+**端点**：`POST /api/v2/sdk/kernel-version/page`
+
+**认证**：需要（API Key）
+
+分页查询当前可用的内核版本，返回每个版本支持的平台、架构、下载地址等信息。创建环境时 `finger.kernel` 和 `finger.kernelVersion` 的有效值均来自此接口。
+
+**请求参数**：
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，从 1 开始 |
+| pageSize | int | 否 | 每页条数，默认 10 |
+| platform | string | 否 | 按平台筛选，如 `windows`、`linux`、`macos`，来自 `/platformList` |
+| arch | string | 否 | 按架构筛选，如 `x86_64`、`arm64`，来自 `/archList` |
+| kernelId | string | 否 | 按内核类型筛选，如 `chrome` |
+| majorVersion | string | 否 | 按主版本号筛选，如 `134`、`131` |
+| status | int | 否 | 状态筛选：`1`=已发布，`2`=隐藏 |
+
+**请求示例**：
+
+```bash
+curl -X POST "https://api.brosdk.com/api/v2/sdk/kernel-version/page" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"page": 1, "pageSize": 20, "platform": "windows", "arch": "x86_64"}'
+```
+
+**响应示例**：
+
+```json
+{
+  "code": 200,
+  "msg": "OK",
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "kernelId": "chrome",
+        "kernelName": "chromium",
+        "kernel": "Chrome",
+        "majorVersion": "134",
+        "kernelVersion": "134",
+        "platform": "windows",
+        "platformDesc": "Windows",
+        "arch": "x86_64",
+        "archDesc": "x86_64",
+        "label": "Chrome 134 (windows/x86_64)",
+        "fingerMode": "server",
+        "fingerModeDesc": "服务端生成指纹",
+        "canCreate": true,
+        "versionCode": 13400001,
+        "minVersionCode": 13400000,
+        "url": "https://example.com/chrome-134-windows-x86_64.zip",
+        "md5": "abc123...",
+        "sha256": "def456...",
+        "releaseNotes": "Chrome 134 stable release"
+      }
+    ],
+    "total": 50,
+    "pageSize": 20,
+    "currentPage": 1
+  }
+}
+```
+
+**响应字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| list[].id | int | 内核版本记录 ID |
+| list[].kernelId | string | 内核标识，如 `chrome` |
+| list[].kernelName | string | 内核名称，如 `chromium` |
+| list[].kernel | string | **创建/更新环境时传入的 `finger.kernel` 值**，如 `Chrome` |
+| list[].majorVersion | string | 主版本号，如 `134` |
+| list[].kernelVersion | string | **创建/更新环境时传入的 `finger.kernelVersion` 值**，如 `134` |
+| list[].platform | string | 操作系统平台，如 `windows`、`linux` |
+| list[].platformDesc | string | 平台展示名称 |
+| list[].arch | string | CPU 架构，如 `x86_64`、`arm64` |
+| list[].archDesc | string | 架构展示名称 |
+| list[].label | string | 展示名称，如 `Chrome 134 (windows/x86_64)` |
+| list[].fingerMode | string | 指纹生成方式：`server`=服务端生成，`sdk`=SDK 端生成 |
+| list[].fingerModeDesc | string | 指纹生成方式说明 |
+| list[].canCreate | bool | 是否可用于创建环境 |
+| list[].versionCode | int | 版本数值，用于版本大小比较 |
+| list[].minVersionCode | int | 最低兼容版本数值 |
+| list[].url | string | 内核包下载地址 |
+| list[].md5 | string | 内核包 MD5 校验值 |
+| list[].sha256 | string | 内核包 SHA256 校验值 |
+| list[].releaseNotes | string | 版本发布说明 |
+| total | int | 总条数 |
+| pageSize | int | 每页大小 |
+| currentPage | int | 当前页码 |
+
+> 💡 **提示**：创建环境时，`finger.kernel` 和 `finger.kernelVersion` 的有效组合从此接口的 `kernel` 和 `kernelVersion` 字段获取；`canCreate` 为 `true` 的版本才可用于创建环境。
+
+---
+
 ### 基本参数
 
 | 参数 | 类型 | 必填 | 说明 | 默认值 |
