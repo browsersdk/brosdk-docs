@@ -1,6 +1,6 @@
 # BroSDK SDK 参考
 
-> **当前版本：v1.0.0.7　　最后更新：2026-05-23** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
+> **当前版本：v1.0.0.7　　最后更新：2026-05-14** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
@@ -459,7 +459,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | --- | --- | --- | --- |
 | `userSig` | string | 是 | 后端签发的用户令牌 |
 | `workDir` | string | 否 | 工作目录根路径，实际运行目录会被解析为 `workDir/appId` |
-| `extsDir` | string | 否 | 本地扩展包根目录；不传时默认使用实际运行目录下的 `extensions` 目录 |
 | `port` | integer | 否 | 内嵌 Web API 端口；不传则不开启，传 `0` 自动分配空闲端口 |
 | `sdkApiUrl` | string | 否 | 覆盖 SDK 后端地址；不传则使用 SDK 内置默认地址 |
 | `autoUpdateKernel` | bool | 否 | 覆盖 SDK 后端配置的`autoUpdateKernel`参数 |
@@ -483,19 +482,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 }
 
 ```
-
-扩展目录说明：
-
-*   `extsDir` 只在初始化阶段用于扫描本地扩展包，不是 `browser/open` 的动态安装入口
-    
-*   `extsDir` 为空时，SDK 会使用实际运行目录下的 `extensions` 目录，例如 `workDir/appId/extensions`
-    
-*   目录结构支持 `extsDir/{extension}/manifest.json`，也支持 `extsDir/{extension}/{version}/manifest.json`
-    
-*   扩展 `manifest.json` 必须包含 `key`，SDK 会按 Chrome 扩展 ID 算法从该 `key` 生成扩展 ID
-    
-*   当前只加载 Manifest V3 扩展；`manifest_version <= 2` 的扩展会被忽略
-    
 
 当前实现的重要限制：
 
@@ -721,7 +707,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | `forward` | string | 否 | 本次启动使用的前置跳板，优先级高于环境绑定的 `bridgeProxy` |
 | `args` | array | 否 | Chromium 兼容命令行参数，每项为完整 switch |
 | `urls` | array | 否 | 启动后自动打开的 URL |
-| `extensions` | array | 否 | 传给已加载扩展的本次启动数据配置 |
+| `extensions` | array | 否 | 本次启动注入的扩展数据配置 |
 | `cookies` | array | 否 | 本次启动注入的 Cookie JSON 数组 |
 | yunConfig | object | 否 | 定制浏览器透传内容 |
 
@@ -744,19 +730,9 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `id` | string | 是 | 已从 `extsDir` 加载的 Chrome 扩展 ID |
+| `name` | string | 是 | 扩展名称 |
+| `id` | string | 是 | Chrome 扩展 ID |
 | `data` | object<string,string> | 否 | 传给扩展的键值数据；键和值均为字符串，具体编码由扩展约定 |
-
-扩展加载与传参是两个阶段：
-
-*   `sdk_init` 阶段通过 `extsDir` 扫描并加载本地扩展包
-    
-*   `browser/open` 阶段的 `extensions[ ]` 不会安装新扩展，只会按 `id` 匹配已加载扩展，并把 `data` 透传给该扩展
-    
-*   如果 `extensions[ ].id` 没有匹配到初始化阶段已加载的扩展，该项会被忽略
-    
-*   扩展 ID 来自扩展 `manifest.json` 中的 `key`；请保持同一扩展的 `key` 稳定，否则生成的 ID 会变化
-    
 
 `cookies[ ]` 对象字段兼容浏览器 Cookie JSON：
 
@@ -823,6 +799,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 			},
 			"extensions": [
 				{
+					"name": "chrome-mv3",
 					"id": "jicbihcejeehghnlckloefbklclkkbei",
 					"data": {
 						"key1": "aGVsbG8=",
@@ -831,6 +808,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 					}
 				},
 				{
+					"name": "testExt2",
 					"id": "afgbmmdnakcefnkchckgelobigkbboci",
 					"data": {
 						"data1": "5Zyo5ZCX77yfCg==",
