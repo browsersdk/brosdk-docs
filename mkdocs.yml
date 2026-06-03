@@ -84,6 +84,7 @@ nav:
     - 环境管理: user-guide/environment.md
     - 启动参数与 CDP: user-guide/browser-launch.md
   - 集成指南:
+    - MCP 使用指南: integration/mcp.md
     - SDK 回调机制: integration/callback.md
     - C 语言集成: integration/c-native.md
     - Rust 集成: integration/rust.md

@@ -168,6 +168,8 @@ SDK 在每次浏览器启动前按以下优先级决策网络路径：
 
 适合 AI 辅助自动化场景，将 CDP 封装为 AI 可调用的工具。
 
+如果你希望 AI Agent 不仅连接 CDP，还能直接调用 BroSDK 的环境管理、浏览器打开和录制回放能力，优先使用 [MCP 使用指南](../integration/mcp.md) 中的 `brosdk-mcp-go`。
+
 **安装依赖**：确保 Node.js 18+
 
 **MCP 配置**（`~/.workbuddy/mcp.json`）：

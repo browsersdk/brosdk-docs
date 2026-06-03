@@ -130,6 +130,90 @@ paths:
                         type: string
                         description: 环境 ID
 
+  /api/v2/browser/update:
+    post:
+      tags:
+        - 环境管理
+      summary: 更新环境
+      description: 更新环境元数据和指纹配置
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - envId
+              properties:
+                envId:
+                  type: string
+                  description: 环境 ID
+                envName:
+                  type: string
+                  description: 环境名称
+                remark:
+                  type: string
+                  description: 备注
+                serial:
+                  type: string
+                  description: 环境序号
+                region:
+                  type: string
+                  description: 国家代号（US, CN 等）
+                proxy:
+                  type: string
+                  description: 代理配置 (socks5://user:pwd@ip:port)
+                ipChannel:
+                  type: string
+                  enum: [ip2location, ipdata]
+                  description: IP 监测渠道
+                bridgeProxy:
+                  type: string
+                  description: 桥代理配置
+                finger:
+                  $ref: '#/components/schemas/FingerConfig'
+      responses:
+        '200':
+          description: 成功
+
+  /api/v2/browser/updateEnv:
+    post:
+      tags:
+        - 环境管理
+      summary: 更新环境元数据
+      description: 仅更新环境元数据，不修改指纹配置
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - envId
+              properties:
+                envId:
+                  type: string
+                  description: 环境 ID
+                envName:
+                  type: string
+                  description: 环境名称，长度不大于 32 个字符
+                serial:
+                  type: string
+                  description: 环境序号，长度不大于 64 个字符
+                proxy:
+                  type: string
+                  description: 代理配置
+                bridgeProxy:
+                  type: string
+                  description: 桥代理配置
+      responses:
+        '200':
+          description: 成功
+
 components:
   securitySchemes:
     BearerAuth:

@@ -380,6 +380,42 @@ Authorization: Bearer YOUR_API_KEY
 
 **响应**：返回更新后的环境信息。
 
+### 仅更新环境元数据
+
+当只需要修改环境名称、序号、代理等元数据，而不希望触碰现有指纹配置时，使用该接口。
+
+**端点**：`POST /api/v2/browser/updateEnv`
+
+**认证**：需要（API Key）
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+**请求参数**：
+
+```json
+{
+  "envId": "env_id_to_update",
+  "envName": "new_env_name",
+  "serial": "serial_001",
+  "proxy": "socks5://user:pass@proxy.com:1080",
+  "bridgeProxy": "http://user:pass@bridge-proxy.com:8080"
+}
+```
+
+**字段说明**：
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envId | string | 是 | 环境 ID |
+| envName | string | 否 | 环境名称，长度不大于 32 个字符 |
+| serial | string | 否 | 环境序号，长度不大于 64 个字符 |
+| proxy | string | 否 | 代理配置 |
+| bridgeProxy | string | 否 | 桥代理配置 |
+
+**响应**：返回更新后的环境元数据，不修改指纹。
+
 ### 使用 SDK API
 
 **端点**：`POST /sdk/v1/env/update`
@@ -688,7 +724,7 @@ Authorization: Bearer YOUR_USER_SIGN
 ```mermaid
 flowchart TD
     A[创建环境<br/>POST /api/v2/browser/create<br/>Returns: envId] --> B[使用环境<br/>SDK 初始化使用 envId<br/>环境数据持久化]
-    B --> C[查询/更新环境<br/>POST /api/v2/browser/page<br/>POST /api/v2/browser/update]
+    B --> C[查询/更新环境<br/>POST /api/v2/browser/page<br/>POST /api/v2/browser/update<br/>POST /api/v2/browser/updateEnv]
     C --> D[销毁环境<br/>POST /api/v2/browser/destroy<br/>删除环境及所有持久化数据]
     
     style A fill:#e3f2fd,stroke:#1976d2

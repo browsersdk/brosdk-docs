@@ -60,6 +60,7 @@ flowchart LR
 
 ### 集成指南
 
+- [MCP 使用指南](integration/mcp.md) - 使用 `brosdk-mcp-go` 让 AI Agent 直接操控浏览器环境
 - [原生 C 集成](integration/c-native.md) - 如何在 C/C++ 项目中集成 SDK
 
 ## 相关资源
@@ -74,6 +75,7 @@ flowchart LR
 | 📘 TypeScript SDK | [github.com/browsersdk/brosdk-typescript](https://github.com/browsersdk/brosdk-typescript) | C++ SDK 的 TS 封装（需配合 C++ SDK 使用） |
 | 📖 SDK Demo | [github.com/browsersdk/browser-demo](https://github.com/browsersdk/browser-demo) | 示例代码 |
 | 🚀 Go 服务端 SDK | [github.com/browsersdk/brosdk-server-go](https://github.com/browsersdk/brosdk-server-go) | 服务端 API 封装 |
+| 🤖 MCP Server | [github.com/browsersdk/brosdk-mcp-go](https://github.com/browsersdk/brosdk-mcp-go) | 面向 AI Agent 的 MCP SSE 服务 |
 | 📚 SDK 参考文档 | [sdk-reference.md](sdk-reference.md) | 完整 API 文档 |
 
 ## 技术支持
@@ -92,6 +94,7 @@ flowchart LR
 - **数据持久化**：独立的环境数据，支持 Cookie、历史记录等
 - **多种语言支持**：提供 C、TypeScript 等多种语言 SDK
 - **灵活的 API**：服务端 API 和 SDK API 两种调用方式
+- **AI Agent 集成**：通过 MCP Server 直接暴露环境管理和浏览器操作能力
 
 ## 贡献
 

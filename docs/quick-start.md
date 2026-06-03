@@ -159,5 +159,6 @@ macOS 用户请将 `brosdk.dylib` 放到 `brosdk-rust` README 中说明的 macOS
 
 - [环境管理](user-guide/environment.md)：理解环境创建、更新、分页查询和销毁。
 - [启动参数与 CDP](user-guide/browser-launch.md)：了解启动参数、CDP 和自动化连接方式。
+- [MCP 使用指南](integration/mcp.md)：让 Claude Desktop、CodeBuddy 等 AI Agent 通过 MCP 直接调用 BroSDK。
 - [Rust 集成](integration/rust.md)：把 Demo 中的调用方式接入你自己的 Rust 或 Tauri 项目。
 - [SDK 参考](sdk-reference.md)：查看完整 SDK API、返回码和事件说明。

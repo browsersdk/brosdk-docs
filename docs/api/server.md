@@ -287,6 +287,46 @@ Content-Type: application/json
 
 ---
 
+### 更新环境元数据
+
+仅更新环境元数据，不修改指纹配置。适用于重命名环境、更新环境序号或切换代理等场景。
+
+**端点**：`POST /api/v2/browser/updateEnv`
+
+**认证**：需要（API Key）
+
+#### 请求参数
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| envId | string | 是 | 环境 ID |
+| envName | string | 否 | 环境名称，长度不大于 32 个字符 |
+| serial | string | 否 | 环境序号，长度不大于 64 个字符 |
+| proxy | string | 否 | 代理配置 |
+| bridgeProxy | string | 否 | 桥代理配置 |
+
+#### 请求示例
+
+```http
+POST https://api.brosdk.com/api/v2/browser/updateEnv
+Authorization: Bearer your_api_key_here
+Content-Type: application/json
+
+{
+  "envId": "2034183257439866880",
+  "envName": "仅更新元数据后的名称",
+  "serial": "A-10001",
+  "proxy": "socks5://user:pass@new-proxy.com:1080",
+  "bridgeProxy": "http://bridge-user:bridge-pass@bridge-proxy.com:8080"
+}
+```
+
+#### 响应
+
+返回更新后的环境元数据；该接口不会修改 `finger` 指纹配置。
+
+---
+
 ### 查询环境列表
 
 分页查询环境列表。
@@ -877,6 +917,7 @@ Content-Type: application/json
 | --- | --- | --- |
 | `/api/v2/browser/create` | `/sdk/v1/env/create` | 创建环境 |
 | `/api/v2/browser/update` | `/sdk/v1/env/update` | 更新环境 |
+| `/api/v2/browser/updateEnv` | - | 仅更新环境元数据，且仅服务端 API 提供 |
 | `/api/v2/browser/destroy` | `/sdk/v1/env/destroy` | 销毁环境 |
 | `/api/v2/browser/page` | `/sdk/v1/env/page` | 环境列表 |
 | `/api/v2/browser/getUserSig` | - | 仅服务端 API |
