@@ -242,8 +242,7 @@ data: {"code":100,"data":"{\"type\":\"browser-open-success\",\"reqId\":42,...}"}
 2. 访问 `http://127.0.0.1:8765/health` 确认服务已启动
 3. 检查原生库是否存在，或自动下载是否成功
 4. 检查 `workDir` 是否可写
-5. 检查本机网络是否能访问 `https://api.brosdk.com`
-6. 如果是异步工具无结果，确认 MCP Client 已建立 SSE 连接
+5. 如果是异步工具无结果，确认 MCP Client 已建立 SSE 连接
 
 ## 相关链接
 
