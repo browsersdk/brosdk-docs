@@ -1,6 +1,6 @@
-# brosdk接入文档
+# BroSDK SDK 参考
 
-> **当前版本：v1.0.0.9　　最后更新：2026-06-04** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
+> **当前版本：v1.0.0.7　　最后更新：2026-05-23** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
@@ -134,7 +134,6 @@ BroSDK 直接生成的同步响应结构如下：
   }
 }
 
-
 ```
 
 | 字段 | 类型 | 说明 |
@@ -175,7 +174,6 @@ BroSDK 直接生成的同步响应结构如下：
   }
 }
 
-
 ```
 
 注意事项：
@@ -202,18 +200,19 @@ BroSDK 直接生成的同步响应结构如下：
     "status": 2,
     "statusName": "Started",
     "progress": 100,
-    "remoteDebuggingPort": 65534
+    "remoteDebuggingPort": 65534,
+    "cdpReady": true
   },
   "envList": [
     {
       "envId": "2041695386304778240",
       "status": 2,
       "statusName": "Started",
-      "progress": 100
+      "progress": 100,
+      "cdpReady": true
     }
   ]
 }
-
 
 ```
 
@@ -226,6 +225,7 @@ BroSDK 直接生成的同步响应结构如下：
 | `statusName` | string | 生命周期状态名称 |
 | `progress` | int | 当前进度百分比 |
 | `remoteDebuggingPort` | int | CDP 端口，若当前实例已开启 |
+| `cdpReady` | bool | CDP 是否已可用于业务逻辑 |
 
 当前 `statusName` 可能出现：
 
@@ -250,27 +250,17 @@ BroSDK 直接生成的同步响应结构如下：
 *   `StopFailed`
     
 
-成功事件与日志告警的关系：
-
-*   `browser-open-success` 是业务成功事件，表示浏览器进程已运行；正常成功时 `code=CL_OK`
-    
-*   如果打开链路中代理桥启动失败或运行时代理探测失败，但浏览器最终仍然启动成功，SDK 仍发送 `browser-open-success`
-    
-*   上述“启动成功但未 100% 按预期启动”的情况，事件 `type` 仍是 `browser-open-success`，但 `code` 可以是 `CL_WPROXYDEGRADED`；后端上报日志也会以 `level=Warn` 以及 `extra.lifecycle.steps[ ]` 中的 `proxy` 步骤体现
-    
-
 ## 4. 代理字段与当前策略
 
 ### 4.1 字段口径
 
-代理桥决策会综合环境绑定代理与本次打开浏览器参数。`proxy` 与 `bridgeProxy` 可在创建或更新环境时绑定；`browser/open` 支持通过 `forward` 或 `bridge` 覆盖本次启动的跳板配置。
+代理桥决策会综合环境绑定代理与本次打开浏览器参数。`browser/open` 请求体中只支持传入 `forward`；`proxy` 与 `bridgeProxy` 应在创建或更新环境时绑定。
 
 | 字段 | 来源 | 说明 |
 | --- | --- | --- |
 | `proxy` | 环境创建 / 更新阶段绑定 | 最终上游代理；不作为 `browser/open` 参数传入 |
 | `forward` | `browser/open` 本次启动参数 | 显式前置跳板，优先级高于 `bridgeProxy` |
-| `bridge` | `browser/open` 本次启动参数 | 本次启动使用的备用前置跳板；传入后会覆盖环境绑定的 `bridgeProxy` |
-| `bridgeProxy` | 环境创建 / 更新阶段绑定 | 环境默认备用前置跳板 |
+| `bridgeProxy` | 环境创建 / 更新阶段绑定 | 备用前置跳板；不作为 `browser/open` 参数传入 |
 
 推荐统一使用完整代理 URL：
 
@@ -289,59 +279,56 @@ BroSDK 直接生成的同步响应结构如下：
 
 | 优先级 | 条件 | 实际行为 |
 | --- | --- | --- |
-| 1 | `browser/open` 传入 `forward` | `本地 bridge -> forward -> proxy(如已绑定) -> 目标网站` |
-| 2 | `forward` 为空 + `browser/open` 传入 `bridge` | `本地 bridge -> bridge -> proxy(如已绑定) -> 目标网站` |
-| 3 | `forward` 和 `bridge` 均为空 + 环境绑定的 `bridgeProxy` 有值 | `本地 bridge -> bridgeProxy -> proxy(如已绑定) -> 目标网站` |
-| 4 | 没有前置跳板，但环境绑定的 `proxy` 有值 | `本地 bridge -> proxy -> 目标网站` |
+| 1 | 环境绑定的 `proxy` 为空 | 不走业务代理，`bridgeProxy` 和 `forward` 同时清空 |
+| 2 | 环境绑定的 `proxy` 有值 + 宿主机已具备出海能力（`global=true`） | 直接使用 `proxy`，忽略 `bridgeProxy` 和 `forward` |
+| 3 | 环境绑定的 `proxy` 有值 + `global=false` + `browser/open` 传入 `forward` | `本地 bridge -> forward -> proxy -> 目标网站` |
+| 4 | 环境绑定的 `proxy` 有值 + `global=false` + `forward` 为空 + 环境绑定的 `bridgeProxy` 有值 | `本地 bridge -> bridgeProxy -> proxy -> 目标网站` |
 
-> `global` 是 SDK 内部对宿主机出海能力的判断值，不是客户配置字段。当前默认策略会保留跳板配置，不再因为 `global=true` 自动清空 `forward` / `bridge` / `bridgeProxy`。
+> `global` 是 SDK 内部对宿主机出海能力的判断值，不是客户配置字段。
 
 进入代理桥时，SDK 会为每个浏览器实例单独启动一个本地 loopback bridge，并向 Chromium 注入：
 
 ```text
 --proxy-server=socks5://127.0.0.1:{port}
 
-
 ```
 
 关键约束：
 
-*   `forward`、`bridge` 和 `bridgeProxy` 不会同时生效，**当前不支持双跳前置链**（即不存在 `forward -> bridgeProxy -> proxy` 这种路径）
+*   `forward` 和 `bridgeProxy` 不会同时生效，**当前不支持双跳前置链**（即不存在 `forward -> bridgeProxy -> proxy` 这种路径）
     
-*   `browser/open` 支持传入 `forward` 和 `bridge`；`proxy` 仍请在创建或更新环境时绑定
+*   `browser/open` 只支持传入 `forward`；`proxy` 和 `bridgeProxy` 请在创建或更新环境时绑定
     
 
 ### 4.3 当前默认策略的重要说明
 
 当前实现的三项关键行为：
 
-1.  `forward` 和 `bridge` 是 `browser/open` 可传字段，参与本次启动的代理桥决策
+1.  `forward` 是 `browser/open` 可传字段，参与本次启动的代理桥决策
     
-2.  `bridge` 只影响本次启动；如果传入非空 `bridge`，SDK 会在本次启动中把它作为 `bridgeProxy` 使用
+2.  宿主机已具备出海能力（`global=true`）时，SDK **自动**忽略 `forward` 和 `bridgeProxy`，仅使用 `proxy`
     
-3.  如果没有任何 `proxy`、`forward`、`bridge` 或 `bridgeProxy`，SDK 不注入本地代理桥，浏览器回退至 Chromium 默认网络栈
+3.  `proxy` 为空时，SDK 不注入本地代理桥，同时清空 `bridgeProxy` 和 `forward`
     
 
 注意事项：
 
-*   没有任何代理桥目标时，浏览器回退至 Chromium 默认网络栈，是否走系统代理取决于 Chromium / 操作系统默认行为
+*   `proxy` 为空时，浏览器回退至 Chromium 默认网络栈，是否走系统代理取决于 Chromium / 操作系统默认行为
     
 *   如需行为稳定可预期，请在创建或更新环境时显式绑定完整 `proxy` URL，勿依赖客户机器隐式系统代理配置
     
-*   `forward`、`bridge` 与 `bridgeProxy` 互斥，不支持双跳前置链
+*   `forward` 与 `bridgeProxy` 互斥，不支持双跳前置链
     
 
 ### 4.4 故障与回退
 
 当前实现中，如果代理桥启动失败：
 
-*   SDK 会记录代理桥诊断日志，并在后端上报日志中把打开链路标记为 `Warn`
+*   SDK 会记录 `browser-proxy-*` 相关诊断日志
     
 *   浏览器仍然会继续启动
     
 *   但此时不会再使用 SDK 管理的本地代理桥
-    
-*   如果浏览器最终启动成功，对外最终事件仍是 `browser-open-success`；代理降级时事件 `code=CL_WPROXYDEGRADED`，代理问题通过日志 `extra.lifecycle.steps[ ]` 中的 `proxy` 步骤说明
     
 
 ## 5. Web API 参考
@@ -355,7 +342,6 @@ BroSDK 直接生成的同步响应结构如下：
   "userSig": "your-user-sign",
   "port": 9527
 }
-
 
 ```
 
@@ -399,7 +385,6 @@ WebSocket 是 Web API 的异步事件通道。调用异步接口（`browser/
 
 ```plaintext
 ws://127.0.0.1:{port}/
-
 
 ```
 
@@ -497,7 +482,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   }
 }
 
-
 ```
 
 扩展目录说明：
@@ -510,7 +494,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     
 *   扩展 `manifest.json` 必须包含 `key`，SDK 会按 Chrome 扩展 ID 算法从该 `key` 生成扩展 ID
     
-*   当前只加载 Manifest V3 扩展；`manifest_version <= 2` 的扩展会被忽略
+*   当前只加载 Manifest V3 扩展；`manifest_version <= 2` 的扩展会被忽略
     
 
 当前实现的重要限制：
@@ -554,7 +538,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   }
 }
 
-
 ```
 
 `data.info` 常用字段：
@@ -580,7 +563,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | --- | --- | --- | --- |
 | `url` | string | 是 | 需要探测的目标 URL |
 | `proxy` | string | 否 | 最终上游代理；为空时按直连诊断 |
-| `bridgeProxy` | string | 否 | 诊断链路中的前置跳板；当前接口只读取该字段，不读取 `forward` 或 `bridge` |
+| `bridgeProxy` | string | 否 | 诊断链路中的前置跳板；当前接口只读取该字段，不读取 `forward` |
 
 请求示例：
 
@@ -590,7 +573,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   "proxy": "socks5://target-proxy:5206",
   "bridgeProxy": "socks5://jump-proxy:31034"
 }
-
 
 ```
 
@@ -622,7 +604,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
   }
 }
-
 
 ```
 
@@ -658,7 +639,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   }
 }
 
-
 ```
 
 ### 5.9 `POST /sdk/v1/browser/install`
@@ -682,7 +662,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   ]
 }
 
-
 ```
 
 即时 ACK 示例：
@@ -701,7 +680,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     "dispatchMsg": "done"
   }
 }
-
 
 ```
 
@@ -741,14 +719,13 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | --- | --- | --- | --- |
 | `envId` | string / integer | 是 | 环境 ID |
 | `forward` | string | 否 | 本次启动使用的前置跳板，优先级高于环境绑定的 `bridgeProxy` |
-| `bridge` | string | 否 | 本次启动使用的备用前置跳板；非空时覆盖环境绑定的 `bridgeProxy`优先级低于`forward` |
 | `args` | array | 否 | Chromium 兼容命令行参数，每项为完整 switch |
 | `urls` | array | 否 | 启动后自动打开的 URL |
 | `extensions` | array | 否 | 传给已加载扩展的本次启动数据配置 |
 | `cookies` | array | 否 | 本次启动注入的 Cookie JSON 数组 |
-| `yunConfig` | object | 否 | 定制浏览器透传内容 |
+| yunConfig | object | 否 | 定制浏览器透传内容 |
 
-`browser/open` 不支持通过请求体覆盖 `proxy`。`bridgeProxy` 建议在创建 / 更新环境时绑定；如果只想覆盖本次启动，请在 `browser/open` 中传入 `bridge`。
+`browser/open` 不支持通过请求体覆盖 `proxy` 或 `bridgeProxy`。这两个字段应在创建 / 更新环境时绑定，打开浏览器时 SDK 会从环境信息中读取。
 
 `args[ ]` 仅描述 Chromium 兼容命令行参数，每项应是完整字符串，例如：
 
@@ -767,7 +744,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `id` | string | 是 | 已从 `extsDir` 加载的 Chrome 扩展 ID |
+| `id` | string | 是 | 已从 `extsDir` 加载的 Chrome 扩展 ID |
 | `data` | object<string,string> | 否 | 传给扩展的键值数据；键和值均为字符串，具体编码由扩展约定 |
 
 扩展加载与传参是两个阶段：
@@ -799,7 +776,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 `yunConfig{}` 对象字段：
 
-在yunConfig JSON对象内容会平铺透传到定义版浏览器，例如 `shop{}`、`whitelist[ ]`、`blacklist[ ]` ...
+在yunConfig JSON对象内容会平铺透传到定义版浏览器，例如 `shop{}`、`whitelist[]`、`blacklist[]` ...
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -811,86 +788,88 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 ```json
 {
-    "envs": [
-        {
-            "envId": "2051156171976347648",
-            "forward": "",
-            "bridge": "socks5://jump-proxy.example.com:31034",
-            "args": [
-                "--no-first-run",
-                "--no-default-browser-check",
-                "--disable-web-security",
-                "--remote-allow-origins=*",
-            ],
-            "urls": [
-                "https://baidu.com",
-                "https://bing.com"
-            ],
-            "yunConfig": {
-                "shop": {
-                    "shopId": "cd9ff4d2e44746a5ab58b56c546dfcc6",
-                    "name": "141",
-                    "shortName": "27008",
-                    "platform": "",
-                    "serial": "27008"
-                },
-                "whitelist": [
-                    "www.baidu.com"
-                ],
-                "blacklist": [
-                    "www.cn.bing.com"
-                ]
-            },
-            "extensions": [
-                {
-                    "id": "jicbihcejeehghnlckloefbklclkkbei",
-                    "data": {
-                        "key1": "aGVsbG8=",
-                        "key3": "5L2g5aW9",
-                        "key2": "12345234634574568478asdfdgsdfg"
-                    }
-                },
-                {
-                    "id": "afgbmmdnakcefnkchckgelobigkbboci",
-                    "data": {
-                        "data1": "5Zyo5ZCX77yfCg==",
-                        "ddataTest22345": "d2VsY29tZQo=",
-                        "testData": "!@#%^@$#^#$%&#%^*$%^*$^&*%^&*"
-                    }
-                }
-            ],
-            "cookies": [
-                {
-                    "domain": "www.baidu.com",
-                    "expirationDate": 1776502336,
-                    "hostOnly": true,
-                    "httpOnly": false,
-                    "name": "BD_UPN",
-                    "path": "/",
-                    "sameSite": null,
-                    "secure": false,
-                    "session": false,
-                    "storeId": null,
-                    "value": "123134753"
-                },
-                {
-                    "domain": ".baidu.com",
-                    "expirationDate": 1805640689.802383,
-                    "hostOnly": false,
-                    "httpOnly": false,
-                    "name": "BAIDUID",
-                    "path": "/",
-                    "sameSite": "no_restriction",
-                    "secure": true,
-                    "session": false,
-                    "storeId": null,
-                    "value": "7CC918200AED607C30178FC6F821F9D48:FG=1"
-                }
-            ]
-        }
-    ]
+	"envs": [
+		{
+			"envId": "2051156171976347648",
+			"forward": "",
+			"args": [
+				"--no-first-run",
+				"--no-default-browser-check",
+				"--disable-web-security",
+				"--remote-allow-origins=*",
+				"--remote-debugging-port=0",
+				"--custom-data=aHR0cHM6Ly9iYWlkdS5jb20=",
+				"--x-base-data=mofangUrl=aHR0cHM6Ly9iYWlkdS5jb20="
+			],
+			"urls": [
+				"https://baidu.com",
+				"https://bing.com",
+				"https://myip.ipipv.com"
+			],
+			"yunConfig": {
+				"shop": {
+					"shopId": "cd9ff4d2e44746a5ab58b56c546dfcc6",
+					"name": "141",
+					"shortName": "27008",
+					"platform": "",
+					"serial": "27008"
+				},
+				"whitelist": [
+					"www.baidu.com"
+				],
+				"blacklist": [
+					"www.cn.bing.com"
+				]
+			},
+			"extensions": [
+				{
+					"id": "jicbihcejeehghnlckloefbklclkkbei",
+					"data": {
+						"key1": "aGVsbG8=",
+						"key3": "5L2g5aW9",
+						"key2": "12345234634574568478asdfdgsdfg"
+					}
+				},
+				{
+					"id": "afgbmmdnakcefnkchckgelobigkbboci",
+					"data": {
+						"data1": "5Zyo5ZCX77yfCg==",
+						"ddataTest22345": "d2VsY29tZQo=",
+						"testData": "!@#%^@$#^#$%&#%^*$%^*$^&*%^&*"
+					}
+				}
+			],
+			"cookies": [
+				{
+					"domain": "www.baidu.com",
+					"expirationDate": 1776502336,
+					"hostOnly": true,
+					"httpOnly": false,
+					"name": "BD_UPN",
+					"path": "/",
+					"sameSite": null,
+					"secure": false,
+					"session": false,
+					"storeId": null,
+					"value": "123134753"
+				},
+				{
+					"domain": ".baidu.com",
+					"expirationDate": 1805640689.802383,
+					"hostOnly": false,
+					"httpOnly": false,
+					"name": "BAIDUID",
+					"path": "/",
+					"sameSite": "no_restriction",
+					"secure": true,
+					"session": false,
+					"storeId": null,
+					"value": "7CC918200AED607C30178FC6F821F9D48:FG=1"
+				}
+			]
+		}
+	]
 }
-
 ```
 
 即时 ACK 示例：
@@ -910,7 +889,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   }
 }
 
-
 ```
 
 最终异步事件：
@@ -921,14 +899,10 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     
 *   `browser-open-failed`
     
-*   `browser-open-timeout`
-    
 
 关键语义：
 
-> `browser-open-success` 表示浏览器已完全启动且就绪。 Cookie / Storage / 扩展 / 自动化逻辑应以此通知作为就绪信号。
-
-如果代理桥启动失败或运行中代理探测失败，但浏览器最终仍然启动成功，最终事件仍是 `browser-open-success`，但 `code` 可以是 `CL_WPROXYDEGRADED`。这类“成功但有降级”的情况会在后端上报日志中以 `Warn` 级别和 `extra.lifecycle.steps[ ].name="proxy"` 的步骤明细体现。
+> `browser-open-success` 表示浏览器已完全启动且 CDP 就绪。 Cookie / Storage / 扩展 / 自动化逻辑应以此通知作为就绪信号。
 
 `whiteList` / `blackList` 会随环境配置写入浏览器侧配置；具体命中策略由当前浏览器核心实现决定。`extensions[ ].data` 与 `cookies[ ]` 可能包含敏感数据，接入层应限制数组长度、条目长度和字段格式，并在日志中做脱敏处理。
 
@@ -968,7 +942,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   }
 }
 
-
 ```
 
 最终关闭成功示例：
@@ -983,13 +956,13 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     "envId": "2041415694746128384",
     "status": 4,
     "statusName": "Stopped",
-    "progress": 100
+    "progress": 100,
+    "cdpReady": false
   },
 
   "envList": [ ]
 
 }
-
 
 ```
 
@@ -1005,7 +978,8 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     "envId": "2041415694746128384",
     "status": 4,
     "statusName": "Stopped",
-    "progress": 100
+    "progress": 100,
+    "cdpReady": false,
     "closeReasonCode": 103,
     "closeReasonName": "WBRWPROCEXITED",
     "closeReasonMsg": "browser process exited unexpectedly",
@@ -1016,12 +990,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 }
 
-
 ```
 
 关键语义：
 
-> 即时 ACK 只表示关闭任务已被受理。   只有收到 `browser-close-success`，才表示环境已关闭完成。
+> 即时 ACK 只表示关闭任务已被受理。   只有收到 `browser-close-success`，才表示环境已关闭完成。
 
 ### 5.12 `POST /sdk/v1/browser/cleanup`
 
@@ -1049,7 +1022,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     "2041415694746128385"
   ]
 }
-
 
 ```
 
@@ -1083,7 +1055,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     ]
   }
 }
-
 
 ```
 
@@ -1124,7 +1095,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
     "dispatchMsg": "done"
   }
 }
-
 
 ```
 
@@ -1197,7 +1167,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   "os": "Windows"
 }
 
-
 ```
 
 ### 5.18 `POST /sdk/v1/env/destroy`
@@ -1235,14 +1204,12 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 ```c
 #include "brosdk.h"
 
-
 ```
 
 ### 6.1 核心类型
 
 ```c
 typedef void *sdk_handle_t;
-
 
 ```
 
@@ -1254,7 +1221,6 @@ typedef void(SDK_CALL *sdk_result_cb_t)(
     void *user_data,
     const char *data,
     size_t len);
-
 
 ```
 
@@ -1272,10 +1238,9 @@ typedef void(SDK_CALL *sdk_log_cb_t)(
     const char *data,
     size_t len);
 
-
 ```
 
-SDK 日志回调。`SDK_LOG_TYPE_LOCAL` 表示本地 SDK 日志行；`SDK_LOG_TYPE_SERVER` 表示已进入 sdk-server 上传队列的结构化日志 JSON。回调中的 `data` 只在当前回调有效。
+SDK 日志回调。`SDK_LOG_TYPE_LOCAL` 表示本地 SDK 日志行；`SDK_LOG_TYPE_SERVER` 表示已进入 sdk-server 上传队列的结构化日志 JSON。回调中的 `data` 只在当前回调有效。
 
 ```c
 typedef void(SDK_CALL *sdk_cookies_storage_cb_t)(
@@ -1284,7 +1249,6 @@ typedef void(SDK_CALL *sdk_cookies_storage_cb_t)(
     char **new_data,
     size_t *new_len,
     void *user_data);
-
 
 ```
 
@@ -1295,7 +1259,7 @@ Cookie 持久化前的拦截回调。
 | 函数 | 模式 | 说明 |
 | --- | --- | --- |
 | `sdk_register_result_cb` | 同步 | 注册全局异步回调 |
-| `sdk_register_log_cb` | 同步 | 注册 SDK 日志回调，传 `NULL` 可关闭 |
+| `sdk_register_log_cb` | 同步 | 注册 SDK 日志回调，传 `NULL` 可关闭 |
 | `sdk_register_cookies_storage_cb` | 同步 | 注册 Cookie 拦截回调 |
 | `sdk_init_cpp` | 同步 | 仅获取 SDK 句柄，不执行初始化 |
 | `sdk_init` | 同步 | 初始化 SDK，返回堆分配的 JSON 响应 |
@@ -1319,8 +1283,6 @@ Cookie 持久化前的拦截回调。
 | `sdk_browser_cleanup` | 同步 | 清理指定环境的 `userdatadir` 缓存，返回清理结果 JSON |
 
 `sdk_browser_install` 的请求体与 `/sdk/v1/browser/install` 一致，必须包含 `cores[ ].major`。进度和最终结果通过 `sdk_result_cb_t` 回调返回。
-
-`sdk_browser_open` 的请求体与 `/sdk/v1/browser/open` 一致。`envs[ ]` 对象可携带 `forward` 和 `bridge`；`bridge` 只覆盖本次启动的备用跳板，不修改环境绑定的 `bridgeProxy`。
 
 `sdk_browser_cleanup` 的请求体与 `/sdk/v1/browser/cleanup` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。运行中或正在打开/关闭队列中的环境会返回 `CL_EBUSY`，结果项状态为 `busy`。
 
@@ -1353,7 +1315,6 @@ Cookie 持久化前的拦截回调。
 SDK_API void *SDK_CALL sdk_malloc(size_t size);
 SDK_API void  SDK_CALL sdk_free(void *ptr);
 
-
 ```
 
 所有 SDK 返回的动态内存都应通过 `sdk_free()` 释放。
@@ -1362,7 +1323,6 @@ SDK_API void  SDK_CALL sdk_free(void *ptr);
 SDK_API const char *SDK_CALL sdk_error_name(int32_t code);
 SDK_API const char *SDK_CALL sdk_error_string(int32_t code);
 SDK_API const char *SDK_CALL sdk_event_name(int32_t evtid);
-
 
 ```
 
@@ -1375,7 +1335,6 @@ SDK_API bool SDK_CALL sdk_is_reqid(int32_t code);
 SDK_API bool SDK_CALL sdk_is_ok(int32_t code);
 SDK_API bool SDK_CALL sdk_is_done(int32_t code);
 SDK_API bool SDK_CALL sdk_is_event(int32_t code);
-
 
 ```
 
@@ -1527,8 +1486,6 @@ Storage 的链路不同：
     
 *   浏览器可用的真正信号是 `browser-open-success`
     
-*   `browser-open-success` 是浏览器可用信号；代理桥降级这类“成功但有告警”的情况，`code` 可以是 `CL_WPROXYDEGRADED`，请同时查看后端上报日志的 `level=Warn` 和 `extra.lifecycle`
-    
 *   浏览器真正关闭完成的信号是 `browser-close-success`
     
 *   `browser-close-success` 只保证本地持久化完成，不保证 OSS 上传完成
@@ -1539,9 +1496,9 @@ Storage 的链路不同：
     
 *   `env/create`、`env/update`、`env/page`、`env/destroy` 的请求参数与响应字段请以后端对接文档为准，SDK 文档不重复维护
     
-*   如需代理行为稳定可预期，请在创建 / 更新环境时绑定 `proxy` / `bridgeProxy`，并在 `browser/open` 中按需传入 `forward` 或 `bridge`；勿依赖客户机器隐式系统代理环境
+*   如需代理行为稳定可预期，请在创建 / 更新环境时绑定 `proxy` / `bridgeProxy`，并在 `browser/open` 中按需传入 `forward`；勿依赖客户机器隐式系统代理环境
     
-*   `netdiag` 只读取 `bridgeProxy` 作为诊断跳板；如果要验证浏览器启动中的 `forward` 或 `bridge` 链路，请把同一个跳板值显式放到 `bridgeProxy` 里诊断
+*   `netdiag` 只读取 `bridgeProxy` 作为诊断跳板；如果要验证浏览器启动中的 `forward` 链路，请把同一个跳板值显式放到 `bridgeProxy` 里诊断
     
 *   `urls`、`args`、`whiteList`、`blackList`、`extensions`、`cookies` 这类数组字段建议由接入层做长度、条目格式和敏感值校验
     
@@ -1569,14 +1526,12 @@ Storage 的链路不同：
 | `20110` | `browser-open` |
 | `20111` | `browser-open-success` |
 | `20112` | `browser-open-failed` |
-| `20113` | `browser-open-timeout` |
 | `20115` | `browser-info` |
 | `20116` | `browser-info-success` |
 | `20117` | `browser-info-failed` |
 | `20140` | `browser-close` |
 | `20141` | `browser-close-success` |
 | `20142` | `browser-close-failed` |
-| `20143` | `browser-close-timeout` |
 | `20150` | `browser-cleanup` |
 | `20151` | `browser-cleanup-success` |
 | `20152` | `browser-cleanup-failed` |
@@ -1608,7 +1563,6 @@ Storage 的链路不同：
 | `20606` | `browser-proxy-socks5-auth-failed` |
 | `20607` | `browser-proxy-socks5-connect-rejected` |
 | `20608` | `browser-proxy-write-failed` |
-| `20609` | `browser-proxy-degraded` |
 
 常用错误 / 警告码：
 
@@ -1616,9 +1570,7 @@ Storage 的链路不同：
 | --- | --- | --- |
 | `0` | `CL_OK` | 成功 |
 | `1` | `CL_DONE` | 异步任务已受理 |
-| `101` | `CL_WDIRNOTEXIST` | 目录不存在；常见于清理本地缓存时目标目录已不存在 |
-| `102` | `CL_WBRWPROCEXITED` | 浏览器进程自行退出；常见于手动关窗或运行中异常退出 |
-| `103` | `CL_WPROXYDEGRADED` | 代理桥降级；浏览器已启动，但代理链路未完全按预期工作 |
+| `103` | `CL_WBRWPROCEXITED` | 浏览器进程自行退出；常见于手动关窗或运行中异常退出 |
 | `104` | `CL_WBUSY` | 资源忙，另一个初始化操作正在进行 |
 | `-3001` | `CL_EBUSY` | 资源忙；例如清理环境缓存时目标环境仍在运行或仍在打开/关闭队列中 |
 | `-3002` | `CL_ETIMEOUT` | 超时 |
@@ -1629,18 +1581,14 @@ Storage 的链路不同：
 | `-3023` | `CL_EOSS_NOCLIENT` | OSS 客户端未初始化 |
 | `-3024` | `CL_EOSS_DOWNLOAD` | OSS 下载失败 |
 | `-3025` | `CL_EOSS_UPLOAD` | OSS 上传失败 |
-| `-3027` | `CL_EOSS_NOTFOUND` | OSS 对象不存在 |
 | `-3028` | `CL_ECOOKIE_RESTORE` | Cookie 恢复失败 |
 | `-3029` | `CL_ESTORAGE_RESTORE` | Storage 恢复失败 |
-| `-3030` | `CL_ENOCORERESOURCE` | 没有可用浏览器核心资源 |
 | `-3502` | `CL_EHTTP_POST` | 后端 HTTP 失败 |
 | `-3509` | `CL_ETOKEN_INVALID` | Token 无效 |
 | `-3511` | `CL_EWORKDIR_INVALID` | 工作目录无效 |
 | `-3512` | `CL_ENETWORK` | 网络或代理诊断失败 |
-| `-3513` | `CL_EBROWSER` | 浏览器错误 |
-| `-3514` | `CL_EBRWPROCEXITED` | 浏览器进程异常退出 |
 | `-4000` 及以下 | `CL_ESDKAPI` 系列 | 后端 SDK API 错误 |
 
 ---
 
-本文明确区分了 BroSDK 直接生成的响应结构与直接透传后端的 env 接口响应结构。 如接入侧同时依赖完整的后端环境模型，请以后端 env API 契约作为完整字段集合的最终依据。
+本文明确区分了 BroSDK 直接生成的响应结构与直接透传后端的 env 接口响应结构。 如接入侧同时依赖完整的后端环境模型，请以后端 env API 契约作为完整字段集合的最终依据。
