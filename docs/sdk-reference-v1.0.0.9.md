@@ -1,6 +1,6 @@
 # brosdk接入文档
 
-> **当前版本：v1.0.1.0　　最后更新：2026-06-06** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
+> **当前版本：v1.0.0.9　　最后更新：2026-06-04** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
@@ -263,12 +263,12 @@ BroSDK 直接生成的同步响应结构如下：
 
 ### 4.1 字段口径
 
-代理桥决策会综合环境绑定代理与本次打开浏览器参数。`proxy` 与 `bridgeProxy` 可在创建或更新环境时绑定；`browser/open` 支持通过 `forward` 或 `bridge` 覆盖本次启动的代理或跳板配置。
+代理桥决策会综合环境绑定代理与本次打开浏览器参数。`proxy` 与 `bridgeProxy` 可在创建或更新环境时绑定；`browser/open` 支持通过 `forward` 或 `bridge` 覆盖本次启动的跳板配置。
 
 | 字段 | 来源 | 说明 |
 | --- | --- | --- |
 | `proxy` | 环境创建 / 更新阶段绑定 | 最终上游代理；不作为 `browser/open` 参数传入 |
-| `forward` | `browser/open` 本次启动参数 | 本次启动显式代理，优先级最高；有环境 `proxy` 时作为前置跳板，无环境 `proxy` 时作为本次最终代理 |
+| `forward` | `browser/open` 本次启动参数 | 显式前置跳板，优先级高于 `bridgeProxy` |
 | `bridge` | `browser/open` 本次启动参数 | 本次启动使用的备用前置跳板；传入后会覆盖环境绑定的 `bridgeProxy` |
 | `bridgeProxy` | 环境创建 / 更新阶段绑定 | 环境默认备用前置跳板 |
 
@@ -280,24 +280,21 @@ BroSDK 直接生成的同步响应结构如下：
     
 *   `socks5h://user:pass@host:port`
     
-*   `http://user:pass@host:port`
+*   `http://user:pass@host:port\`
     
 
-### 4.2 当前默认策略的决策规则
+### 4.2 当前默认策略的四条决策规则
 
-当前版本在每次浏览器启动前，会依次评估以下规则（按优先级从高到低）：
+当前版本在每次浏览器启动前，会依次评估以下四条规则（按优先级从高到低）：
 
 | 优先级 | 条件 | 实际行为 |
 | --- | --- | --- |
-| 1 | `browser/open` 传入 `forward`，且环境绑定了 `proxy` | `forward` 优先级最高，不受 `global` 影响；链路为 `本地 bridge -> forward -> proxy -> 目标网站` |
-| 2 | `browser/open` 传入 `forward`，且环境没有绑定 `proxy` | `forward` 作为本次启动最终代理；链路为 `本地 bridge -> forward -> 目标网站` |
-| 3 | `forward` 为空，且 `browser/open` 传入 `bridge` | 本次启动先用 `bridge` 覆盖环境绑定的 `bridgeProxy`；不写回环境配置 |
-| 4 | `forward` 为空，且环境没有绑定 `proxy` | 不启动 SDK 管理的业务代理链；`bridge` / `bridgeProxy` 不会单独生效 |
-| 5 | `forward` 为空，环境绑定了 `proxy`，但没有可用 `bridgeProxy` | `本地 bridge -> proxy -> 目标网站` |
-| 6 | `forward` 为空，环境绑定了 `proxy`，且有可用 `bridgeProxy`，同时 `global=true` | 宿主机网络已具备出海能力，不使用前置跳板；链路为 `本地 bridge -> proxy -> 目标网站` |
-| 7 | `forward` 为空，环境绑定了 `proxy`，且有可用 `bridgeProxy`，同时 `global=false` | `本地 bridge -> bridgeProxy -> proxy -> 目标网站` |
+| 1 | `browser/open` 传入 `forward` | `本地 bridge -> forward -> proxy(如已绑定) -> 目标网站` |
+| 2 | `forward` 为空 + `browser/open` 传入 `bridge` | `本地 bridge -> bridge -> proxy(如已绑定) -> 目标网站` |
+| 3 | `forward` 和 `bridge` 均为空 + 环境绑定的 `bridgeProxy` 有值 | `本地 bridge -> bridgeProxy -> proxy(如已绑定) -> 目标网站` |
+| 4 | 没有前置跳板，但环境绑定的 `proxy` 有值 | `本地 bridge -> proxy -> 目标网站` |
 
-> `global` 是 SDK 内部对宿主机出海能力的判断值，不是客户配置字段。当前策略中，`global` 只影响 `bridgeProxy -> proxy` 这一路径；显式传入的 `forward` 优先级最高，不会因为 `global=true` 被清空。
+> `global` 是 SDK 内部对宿主机出海能力的判断值，不是客户配置字段。当前默认策略会保留跳板配置，不再因为 `global=true` 自动清空 `forward` / `bridge` / `bridgeProxy`。
 
 进入代理桥时，SDK 会为每个浏览器实例单独启动一个本地 loopback bridge，并向 Chromium 注入：
 
@@ -311,34 +308,26 @@ BroSDK 直接生成的同步响应结构如下：
 
 *   `forward`、`bridge` 和 `bridgeProxy` 不会同时生效，**当前不支持双跳前置链**（即不存在 `forward -> bridgeProxy -> proxy` 这种路径）
     
-*   `browser/open` 支持传入 `forward` 和 `bridge`；环境固定上游代理仍请在创建或更新环境时绑定 `proxy`，只影响本次启动的显式代理可使用 `forward`
-
-*   `bridge` 和环境绑定的 `bridgeProxy` 只是备用前置跳板；如果没有 `proxy`，且本次启动也没有传入 `forward`，它们不会单独启动代理链
+*   `browser/open` 支持传入 `forward` 和 `bridge`；`proxy` 仍请在创建或更新环境时绑定
     
 
 ### 4.3 当前默认策略的重要说明
 
-当前实现的关键行为：
+当前实现的三项关键行为：
 
 1.  `forward` 和 `bridge` 是 `browser/open` 可传字段，参与本次启动的代理桥决策
     
-2.  `forward` 是本次启动的显式代理，优先级高于 `bridge` 和环境绑定的 `bridgeProxy`，且不受 `global` 影响；有环境 `proxy` 时作为前置跳板，无环境 `proxy` 时作为最终代理
-
-3.  `bridge` 只影响本次启动；如果传入非空 `bridge`，SDK 会在本次启动中把它作为 `bridgeProxy` 使用
-
-4.  如果没有 `proxy`，且本次启动没有传入 `forward`，SDK 不注入本地代理桥，浏览器回退至 Chromium 默认网络栈
-
-5.  如果传入 `forward` 但没有绑定 `proxy`，链路为 `本地 bridge -> forward -> 目标网站`
+2.  `bridge` 只影响本次启动；如果传入非空 `bridge`，SDK 会在本次启动中把它作为 `bridgeProxy` 使用
+    
+3.  如果没有任何 `proxy`、`forward`、`bridge` 或 `bridgeProxy`，SDK 不注入本地代理桥，浏览器回退至 Chromium 默认网络栈
     
 
 注意事项：
 
-*   没有代理桥目标时，浏览器回退至 Chromium 默认网络栈，是否走系统代理取决于 Chromium / 操作系统默认行为
+*   没有任何代理桥目标时，浏览器回退至 Chromium 默认网络栈，是否走系统代理取决于 Chromium / 操作系统默认行为
     
-*   如需行为稳定可预期，请显式绑定完整 `proxy` URL，或在 `browser/open` 中显式传入完整 `forward` URL；勿依赖客户机器隐式系统代理配置
+*   如需行为稳定可预期，请在创建或更新环境时显式绑定完整 `proxy` URL，勿依赖客户机器隐式系统代理配置
     
-*   非空但格式无法识别的代理 URL 不会让浏览器回退本地直连；SDK 会把它归一化为不可达代理 `socks5://127.0.0.1:9`，从而保持“必须走代理链”的约束
-
 *   `forward`、`bridge` 与 `bridgeProxy` 互斥，不支持双跳前置链
     
 
@@ -553,7 +542,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   "data": {
     "info": {
       "deviceId": "device_xxx",
-      "version": "1.0.1.0",
+      "version": "1.0.0.25",
       "startupTime": 1744123456789,
       "coresInfo": {},
       "netInfo": {},
@@ -592,15 +581,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | `url` | string | 是 | 需要探测的目标 URL |
 | `proxy` | string | 否 | 最终上游代理；为空时按直连诊断 |
 | `bridgeProxy` | string | 否 | 诊断链路中的前置跳板；当前接口只读取该字段，不读取 `forward` 或 `bridge` |
-
-`netdiag` 是独立诊断接口，不执行 `browser/open` 的完整策略脚本。若要诊断本次启动中的 `forward` 或 `bridge` 链路，请按实际启动链路映射字段：
-
-*   `forward + proxy`：把环境 `proxy` 放到 `proxy`，把本次 `forward` 放到 `bridgeProxy`
-
-*   只有 `forward`、没有环境 `proxy`：把本次 `forward` 放到 `proxy`，`bridgeProxy` 留空
-
-*   `bridge + proxy`：把环境 `proxy` 放到 `proxy`，把本次 `bridge` 放到 `bridgeProxy`
-
 
 请求示例：
 
@@ -760,15 +740,15 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `envId` | string / integer | 是 | 环境 ID |
-| `forward` | string | 否 | 本次启动使用的显式代理；优先级最高，高于 `bridge` 和环境绑定的 `bridgeProxy`；有环境 `proxy` 时作为前置跳板，无环境 `proxy` 时作为最终代理 |
-| `bridge` | string | 否 | 本次启动使用的备用前置跳板；非空时覆盖环境绑定的 `bridgeProxy`，优先级低于 `forward` |
+| `forward` | string | 否 | 本次启动使用的前置跳板，优先级高于环境绑定的 `bridgeProxy` |
+| `bridge` | string | 否 | 本次启动使用的备用前置跳板；非空时覆盖环境绑定的 `bridgeProxy`优先级低于`forward` |
 | `args` | array | 否 | Chromium 兼容命令行参数，每项为完整 switch |
 | `urls` | array | 否 | 启动后自动打开的 URL |
 | `extensions` | array | 否 | 传给已加载扩展的本次启动数据配置 |
 | `cookies` | array | 否 | 本次启动注入的 Cookie JSON 数组 |
 | `yunConfig` | object | 否 | 定制浏览器透传内容 |
 
-`browser/open` 不支持通过请求体覆盖环境绑定的 `proxy`。`bridgeProxy` 建议在创建 / 更新环境时绑定；如果只想覆盖本次启动的备用跳板，请在 `browser/open` 中传入 `bridge`。如果本次启动必须强制使用某个代理，请传入 `forward`。
+`browser/open` 不支持通过请求体覆盖 `proxy`。`bridgeProxy` 建议在创建 / 更新环境时绑定；如果只想覆盖本次启动，请在 `browser/open` 中传入 `bridge`。
 
 `args[ ]` 仅描述 Chromium 兼容命令行参数，每项应是完整字符串，例如：
 
@@ -841,10 +821,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
                 "--no-default-browser-check",
                 "--disable-web-security",
                 "--remote-allow-origins=*",
-            ],
-            "urls": [
-                "https://myip.ipipv.com"
-            ],
+            ],
+            "urls": [
+                "https://baidu.com",
+                "https://bing.com"
+            ],
             "yunConfig": {
                 "shop": {
                     "shopId": "cd9ff4d2e44746a5ab58b56c546dfcc6",
@@ -1339,7 +1320,7 @@ Cookie 持久化前的拦截回调。
 
 `sdk_browser_install` 的请求体与 `/sdk/v1/browser/install` 一致，必须包含 `cores[ ].major`。进度和最终结果通过 `sdk_result_cb_t` 回调返回。
 
-`sdk_browser_open` 的请求体与 `/sdk/v1/browser/open` 一致。`envs[ ]` 对象可携带 `forward` 和 `bridge`；`forward` 是本次启动显式代理，`bridge` 只覆盖本次启动的备用跳板，不修改环境绑定的 `bridgeProxy`。
+`sdk_browser_open` 的请求体与 `/sdk/v1/browser/open` 一致。`envs[ ]` 对象可携带 `forward` 和 `bridge`；`bridge` 只覆盖本次启动的备用跳板，不修改环境绑定的 `bridgeProxy`。
 
 `sdk_browser_cleanup` 的请求体与 `/sdk/v1/browser/cleanup` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。运行中或正在打开/关闭队列中的环境会返回 `CL_EBUSY`，结果项状态为 `busy`。
 
@@ -1558,9 +1539,9 @@ Storage 的链路不同：
     
 *   `env/create`、`env/update`、`env/page`、`env/destroy` 的请求参数与响应字段请以后端对接文档为准，SDK 文档不重复维护
     
-*   如需代理行为稳定可预期，请在创建 / 更新环境时绑定 `proxy`，并在 `browser/open` 中按需传入 `forward` 或 `bridge`；`forward` 可作为本次启动显式代理，`bridgeProxy` 是绑定到环境上的备用前置跳板；勿依赖客户机器隐式系统代理环境
+*   如需代理行为稳定可预期，请在创建 / 更新环境时绑定 `proxy` / `bridgeProxy`，并在 `browser/open` 中按需传入 `forward` 或 `bridge`；勿依赖客户机器隐式系统代理环境
     
-*   `netdiag` 不执行 `browser/open` 策略脚本；诊断 `forward` 或 `bridge` 时，请按启动链路把值映射到 `proxy` 或 `bridgeProxy`，不要假设它会自动读取 `forward` / `bridge`
+*   `netdiag` 只读取 `bridgeProxy` 作为诊断跳板；如果要验证浏览器启动中的 `forward` 或 `bridge` 链路，请把同一个跳板值显式放到 `bridgeProxy` 里诊断
     
 *   `urls`、`args`、`whiteList`、`blackList`、`extensions`、`cookies` 这类数组字段建议由接入层做长度、条目格式和敏感值校验
     
@@ -1582,12 +1563,9 @@ Storage 的链路不同：
 | `10130` | `sdk-info` |
 | `10131` | `sdk-info-success` |
 | `10132` | `sdk-info-failed` |
-| `10140` | `sdk-shutdown` |
-| `10141` | `sdk-shutdown-success` |
-| `10142` | `sdk-shutdown-failed` |
-| `10150` | `sdk-netdiag` |
-| `10151` | `sdk-netdiag-success` |
-| `10152` | `sdk-netdiag-failed` |
+| `10140` | `sdk-netdiag` |
+| `10141` | `sdk-netdiag-success` |
+| `10142` | `sdk-netdiag-failed` |
 | `20110` | `browser-open` |
 | `20111` | `browser-open-success` |
 | `20112` | `browser-open-failed` |
