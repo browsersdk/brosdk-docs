@@ -1,22 +1,22 @@
 # brosdk接入文档
 
-> **当前版本：v1.0.1.1　　最后更新：2026-06-12** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
+> **当前版本：v1.0.1.0　　最后更新：2026-06-06** 本文档是 BroSDK 的统一接入参考文档。 内容覆盖动态库接口与 Web API，以 `brosdk.h` 公开接口为准。 如有字段或行为的疑问，请以头文件 `brosdk.h` 为最终依据。
 
 ## 1. 概述
 
 BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提供两种接入方式：
 
 *   动态库接口：直接加载 `brosdk.dll` / `brosdk.so` / `brosdk.dylib`，通过 `brosdk.h` 公开接口调用
-
+    
 *   Web API：初始化时开启本地 HTTP/WebSocket 服务，HTTP 发起请求，WebSocket 接收异步事件
-
+    
 
 两种方式共享同一套浏览器生命周期、环境管理和数据持久化实现，但异步结果的交付方式不同：
 
 *   动态库接口：函数返回值 + `sdk_result_cb_t` 回调
-
+    
 *   Web API：同步接口直接返回；异步接口先返回 ACK，最终结果通过 WebSocket 推送
-
+    
 
 ## 2. 平台支持
 
@@ -31,20 +31,20 @@ BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提�
 ### 3.1 JSON 与编码
 
 *   所有请求体均为 UTF-8 JSON
-
+    
 *   所有返回体与通知体均为 UTF-8 JSON
-
+    
 *   动态库接口中的 `len` 均为字节长度，不包含末尾 `\0`
-
+    
 
 ### 3.2 内存管理
 
 *   动态库接口返回的 `out_data`，使用后必须调用 `sdk_free()`
-
+    
 *   回调中的 `data` 指针只在当前回调有效，如需长期保存请立即复制
-
+    
 *   `sdk_cookies_storage_cb_t` 若要替换 Cookie 数据，`*new_data` 必须通过 `sdk_malloc()` 分配
-
+    
 
 ### 3.3 返回值、`reqId` 与辅助判断
 
@@ -61,63 +61,63 @@ BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提�
 辅助函数：
 
 *   `sdk_is_ok(code)`
-
+    
 *   `sdk_is_done(code)`
-
+    
 *   `sdk_is_reqid(code)`
-
+    
 *   `sdk_is_warn(code)`
-
+    
 *   `sdk_is_error(code)`
-
+    
 *   `sdk_error_name(code)`
-
+    
 *   `sdk_error_string(code)`
-
+    
 *   `sdk_event_name(evtid)`
-
+    
 
 重要说明：
 
 *   当前异步动态库接口可能返回 `CL_DONE`，也可能直接返回 `reqId`
-
+    
 *   对于 Web API 异步 ACK，顶层 `reqId` 也可能是 `0`，也可能是实际受理到的请求 ID
-
+    
 *   业务接入时，应把“`sdk_is_done(code)` 或 `sdk_is_reqid(code)` 为真”都视为“异步任务已进入调度”
-
+    
 
 ### 3.4 异步回调语义
 
 `sdk_result_cb_t` 是动态库接入时统一的异步结果通道。
 
 *   回调第一个参数 `code` 是本次通知的粗粒度状态
-
+    
 *   `reqId`、`type`、`eventId` 及业务字段以 JSON body 为准
-
+    
 *   回调第一个参数不应用作稳定的 `reqId` 或 `eventId`
-
+    
 
 推荐做法：
 
 1.  解析 JSON body
-
+    
 2.  优先根据顶层 `type` 路由
-
+    
 3.  如需关联请求，使用顶层 `reqId`
-
+    
 4.  `data.eventId` 作为事件枚举补充字段使用
-
+    
 
 **线程安全注意事项：**
 
 *   `sdk_cookies_storage_cb_t` 在 SDK 内部已串行化，不会并发调用
-
+    
 *   `sdk_result_cb_t` 不保证串行，同一回调可能在不同事件驱动时并发调用
-
+    
 *   建议宿主侧在回调中加锁，或只做最小操作（如入队）后在业务线程消费
-
+    
 *   无论哪种回调，**禁止在回调中调用 SDK 阻塞/同步接口**（如 `sdk_init`、`sdk_shutdown`），否则可能导致死锁
-
+    
 
 ### 3.5 同步响应 Envelope
 
@@ -148,13 +148,13 @@ BroSDK 直接生成的同步响应结构如下：
 例外：
 
 *   `env/create`、`env/update`、`env/page`、`env/getinfo`、`env/destroy` 为后端原始 JSON 透传
-
+    
 *   `netdiag` 返回 BroSDK 网络诊断原始 JSON，结构为 `code/msg/ok/data`，不额外包含 `reqId/type`
-
+    
 *   `browser/cleanup` 返回 BroSDK 清理结果原始 JSON，结构为 `code/msg/data`，不额外包含 `reqId/type`
-
+    
 *   上述接口不会额外套一层 BroSDK 自己的 envelope
-
+    
 
 ### 3.6 异步 Web API ACK Envelope
 
@@ -181,11 +181,11 @@ BroSDK 直接生成的同步响应结构如下：
 注意事项：
 
 *   `reqId` 可能为 `0`，也可能为实际异步请求 ID
-
+    
 *   ACK 只表示请求已经进入 SDK 调度器
-
+    
 *   最终成功或失败，必须通过 WebSocket 获取
-
+    
 
 ### 3.7 浏览器生命周期通知结构
 
@@ -230,34 +230,34 @@ BroSDK 直接生成的同步响应结构如下：
 当前 `statusName` 可能出现：
 
 *   `Idle`
-
+    
 *   `Downloading`
-
+    
 *   `Preparing`
-
+    
 *   `Starting`
-
+    
 *   `Started`
-
+    
 *   `Stopping`
-
+    
 *   `Stopped`
-
+    
 *   `Destroyed`
-
+    
 *   `StartFailed`
-
+    
 *   `StopFailed`
-
+    
 
 成功事件与日志告警的关系：
 
 *   `browser-open-success` 是业务成功事件，表示浏览器进程已运行；正常成功时 `code=CL_OK`
-
+    
 *   如果打开链路中代理桥启动失败或运行时代理探测失败，但浏览器最终仍然启动成功，SDK 仍发送 `browser-open-success`
-
+    
 *   上述“启动成功但未 100% 按预期启动”的情况，事件 `type` 仍是 `browser-open-success`，但 `code` 可以是 `CL_WPROXYDEGRADED`；后端上报日志也会以 `level=Warn` 以及 `extra.lifecycle.steps[ ]` 中的 `proxy` 步骤体现
-
+    
 
 ## 4. 代理字段与当前策略
 
@@ -275,13 +275,13 @@ BroSDK 直接生成的同步响应结构如下：
 推荐统一使用完整代理 URL：
 
 *   `socks5://host:port`
-
+    
 *   `socks5://user:pass@host:port`
-
+    
 *   `socks5h://user:pass@host:port`
-
+    
 *   `http://user:pass@host:port`
-
+    
 
 ### 4.2 当前默认策略的决策规则
 
@@ -310,18 +310,18 @@ BroSDK 直接生成的同步响应结构如下：
 关键约束：
 
 *   `forward`、`bridge` 和 `bridgeProxy` 不会同时生效，**当前不支持双跳前置链**（即不存在 `forward -> bridgeProxy -> proxy` 这种路径）
-
+    
 *   `browser/open` 支持传入 `forward` 和 `bridge`；环境固定上游代理仍请在创建或更新环境时绑定 `proxy`，只影响本次启动的显式代理可使用 `forward`
 
 *   `bridge` 和环境绑定的 `bridgeProxy` 只是备用前置跳板；如果没有 `proxy`，且本次启动也没有传入 `forward`，它们不会单独启动代理链
-
+    
 
 ### 4.3 当前默认策略的重要说明
 
 当前实现的关键行为：
 
 1.  `forward` 和 `bridge` 是 `browser/open` 可传字段，参与本次启动的代理桥决策
-
+    
 2.  `forward` 是本次启动的显式代理，优先级高于 `bridge` 和环境绑定的 `bridgeProxy`，且不受 `global` 影响；有环境 `proxy` 时作为前置跳板，无环境 `proxy` 时作为最终代理
 
 3.  `bridge` 只影响本次启动；如果传入非空 `bridge`，SDK 会在本次启动中把它作为 `bridgeProxy` 使用
@@ -329,31 +329,31 @@ BroSDK 直接生成的同步响应结构如下：
 4.  如果没有 `proxy`，且本次启动没有传入 `forward`，SDK 不注入本地代理桥，浏览器回退至 Chromium 默认网络栈
 
 5.  如果传入 `forward` 但没有绑定 `proxy`，链路为 `本地 bridge -> forward -> 目标网站`
-
+    
 
 注意事项：
 
 *   没有代理桥目标时，浏览器回退至 Chromium 默认网络栈，是否走系统代理取决于 Chromium / 操作系统默认行为
-
+    
 *   如需行为稳定可预期，请显式绑定完整 `proxy` URL，或在 `browser/open` 中显式传入完整 `forward` URL；勿依赖客户机器隐式系统代理配置
-
+    
 *   非空但格式无法识别的代理 URL 不会让浏览器回退本地直连；SDK 会把它归一化为不可达代理 `socks5://127.0.0.1:9`，从而保持“必须走代理链”的约束
 
 *   `forward`、`bridge` 与 `bridgeProxy` 互斥，不支持双跳前置链
-
+    
 
 ### 4.4 故障与回退
 
 当前实现中，如果代理桥启动失败：
 
 *   SDK 会记录代理桥诊断日志，并在后端上报日志中把打开链路标记为 `Warn`
-
+    
 *   浏览器仍然会继续启动
-
+    
 *   但此时不会再使用 SDK 管理的本地代理桥
-
+    
 *   如果浏览器最终启动成功，对外最终事件仍是 `browser-open-success`；代理降级时事件 `code=CL_WPROXYDEGRADED`，代理问题通过日志 `extra.lifecycle.steps[ ]` 中的 `proxy` 步骤说明
-
+    
 
 ## 5. Web API 参考
 
@@ -375,11 +375,11 @@ BroSDK 直接生成的同步响应结构如下：
 初始化完成后：
 
 *   Web API HTTP 地址：`http://127.0.0.1:{port}`
-
+    
 *   WebSocket 地址：`ws://127.0.0.1:{port}/`
-
+    
 *   HTTP 请求与 WebSocket 使用同一个本地 TCP 端口
-
+    
 
 `port` 的当前语义：
 
@@ -396,11 +396,11 @@ BroSDK 直接生成的同步响应结构如下：
 当前模型如下：
 
 *   `/sdk/v1/init` 在 JSON body 中携带 `userSig`
-
+    
 *   后续 Web API 请求复用当前已初始化的 SDK 实例
-
+    
 *   `/sdk/v1/token/update` 在 JSON body 中刷新 `userSig`
-
+    
 
 ### 5.3 WebSocket 使用说明
 
@@ -419,11 +419,11 @@ ws://127.0.0.1:{port}/
 #### 消息格式
 
 *   帧类型：UTF-8 JSON 文本帧
-
+    
 *   结构与 `sdk_result_cb_t` 回调收到的 JSON 一致（参见 §3.5 / §3.7）
-
+    
 *   常规 SDK 事件通常包含 `type`（事件名称）、`code`（返回码）和 `reqId` 字段；异常响应可能只在 `data` 中携带错误信息
-
+    
 
 #### 请求与事件关联
 
@@ -442,15 +442,15 @@ HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件
 #### 推荐接入顺序
 
 1.  `sdk_init` 返回成功
-
+    
 2.  建立 WebSocket 连接，准备接收事件（可能立即收到运行状态快照）
-
+    
 3.  发送 HTTP 请求，例如 `POST /sdk/v1/browser/open`
-
+    
 4.  HTTP 响应返回 ACK，记录 `reqId`（若不为 `0`）
-
+    
 5.  通过 WebSocket 接收最终事件，如 `browser-open-success` 或 `browser-open-failed`
-
+    
 
 #### 主动推送事件
 
@@ -514,22 +514,22 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 扩展目录说明：
 
 *   `extsDir` 只在初始化阶段用于扫描本地扩展包，不是 `browser/open` 的动态安装入口
-
+    
 *   `extsDir` 为空时，SDK 会使用实际运行目录下的 `extensions` 目录，例如 `workDir/appId/extensions`
-
+    
 *   目录结构支持 `extsDir/{extension}/manifest.json`，也支持 `extsDir/{extension}/{version}/manifest.json`
-
+    
 *   扩展 `manifest.json` 必须包含 `key`，SDK 会按 Chrome 扩展 ID 算法从该 `key` 生成扩展 ID
-
+    
 *   当前只加载 Manifest V3 扩展；`manifest_version <= 2` 的扩展会被忽略
-
+    
 
 当前实现的重要限制：
 
 *   `sdk_init` 在同一进程内是全局串行入口
-
+    
 *   若已有初始化操作进行中，后续调用直接返回 `CL_WBUSY`
-
+    
 
 ### 5.6 `POST /sdk/v1/info`
 
@@ -538,9 +538,9 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 请求体：
 
 *   推荐传空对象 `{}`
-
+    
 *   空 body 也可
-
+    
 
 成功响应示例：
 
@@ -655,9 +655,9 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 请求体：
 
 *   SDK 层返回全部运行中环境，不支持请求体过滤
-
+    
 *   建议传 `{}` 或空 body
-
+    
 
 成功响应示例：
 
@@ -728,13 +728,13 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 最终异步事件：
 
 *   `browser-install`
-
+    
 *   `browser-install-progress`
-
+    
 *   `browser-install-success`
-
+    
 *   `browser-install-failed`
-
+    
 
 ### 5.10 `POST /sdk/v1/browser/open`
 
@@ -749,11 +749,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 `envs[ ]` 支持三种写法：
 
 *   直接传字符串环境 ID
-
+    
 *   直接传数字环境 ID
-
+    
 *   传对象，对象中包含 `envId` 和可选覆盖参数
-
+    
 
 `envs[ ]` 对象字段：
 
@@ -773,15 +773,15 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 `args[ ]` 仅描述 Chromium 兼容命令行参数，每项应是完整字符串，例如：
 
 *   `--no-first-run`
-
+    
 *   `--no-default-browser-check`
-
+    
 *   `--disable-web-security`
-
+    
 *   `--remote-allow-origins=*`
-
+    
 *   `--remote-debugging-port=0`
-
+    
 
 `extensions[ ]` 对象字段：
 
@@ -793,13 +793,13 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 扩展加载与传参是两个阶段：
 
 *   `sdk_init` 阶段通过 `extsDir` 扫描并加载本地扩展包
-
+    
 *   `browser/open` 阶段的 `extensions[ ]` 不会安装新扩展，只会按 `id` 匹配已加载扩展，并把 `data` 透传给该扩展
-
+    
 *   如果 `extensions[ ].id` 没有匹配到初始化阶段已加载的扩展，该项会被忽略
-
+    
 *   扩展 ID 来自扩展 `manifest.json` 中的 `key`；请保持同一扩展的 `key` 稳定，否则生成的 ID 会变化
-
+    
 
 `cookies[ ]` 对象字段兼容浏览器 Cookie JSON：
 
@@ -935,13 +935,13 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 最终异步事件：
 
 *   `browser-open`
-
+    
 *   `browser-open-success`
-
+    
 *   `browser-open-failed`
-
+    
 *   `browser-open-timeout`
-
+    
 
 关键语义：
 
@@ -964,11 +964,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 `envs[ ]` 支持：
 
 *   字符串环境 ID
-
+    
 *   数字环境 ID
-
+    
 *   仅包含 `envId` 的对象
-
+    
 
 即时 ACK 示例：
 
@@ -1044,25 +1044,20 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 ### 5.12 `POST /sdk/v1/browser/cleanup`
 
-同步清理本地浏览器缓存。该接口同时支持清理指定环境的 `userdatadir` 缓存，以及浏览器内核下载缓存 `cores/.cache`。
+同步清理指定环境的 `userdatadir` 缓存。
 
 请求字段：
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `envs` | array | 否 | 要清理 `userdatadir` 缓存的环境 ID 列表，最多 128 个 |
-| `cores` | array | 否 | 要清理的内核下载缓存列表；字段缺省表示不清理内核缓存，空数组表示清理全部 `.cache` 文件 |
-| `cores[ ].major` | integer / string | 条件必填 | 要清理的浏览器核心主版本号，例如 `141` |
-| `cores[ ].type` | string | 否 | 内核类型过滤，例如 `chrome`；不传则仅按 `major` 匹配 |
-
-`envs` 和 `cores` 至少需要提供一个有效清理目标；两者可以同时提供。
+| `envs` | array | 是 | 要清理缓存的环境 ID 列表，最多 128 个 |
 
 `envs[ ]` 支持：
 
 *   字符串环境 ID
-
+    
 *   数字环境 ID
-
+    
 
 请求示例：
 
@@ -1071,47 +1066,6 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
   "envs": [
     "2041415694746128384",
     "2041415694746128385"
-  ]
-}
-
-
-```
-
-清理指定内核版本缓存：
-
-```json
-{
-  "cores": [
-    {
-      "major": 141
-    }
-  ]
-}
-
-
-```
-
-清理全部内核下载缓存：
-
-```json
-{
-  "cores": []
-}
-
-
-```
-
-同时清理环境 `userdatadir` 和内核下载缓存：
-
-```json
-{
-  "envs": [
-    "2041415694746128384"
-  ],
-  "cores": [
-    {
-      "major": 141
-    }
   ]
 }
 
@@ -1145,26 +1099,7 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
         "status": "not_found",
         "userDataDir": "C:/BroSDK/1234567890/userdata/2041415694746128385"
       }
-    ],
-    "coreCache": {
-      "deleted": 1,
-      "notFound": 0,
-      "invalid": 0,
-      "failed": 0,
-      "filesDeleted": 3,
-      "filesFailed": 0,
-      "results": [
-        {
-          "all": false,
-          "major": 141,
-          "code": 0,
-          "msg": "ok",
-          "status": "deleted",
-          "filesDeleted": 3,
-          "filesFailed": 0
-        }
-      ]
-    }
+    ]
   }
 }
 
@@ -1173,18 +1108,14 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 
 关键语义：
 
-*   `browser/cleanup` 删除指定环境的本地 `userdatadir` 缓存时，不销毁后端环境记录
-
-*   `cores` 只删除内核下载缓存 `cores/.cache` 中的 `.zip`、`.part`、`.merge` 文件，不删除已安装内核目录
-
-*   `cores` 字段缺省表示不处理内核缓存；`"cores": []` 表示清理全部 `.cache` 缓存；`"cores": [{"major": 141}]` 表示只清理指定主版本缓存
-
+*   `browser/cleanup` 只删除指定环境的本地 `userdatadir` 缓存，不销毁后端环境记录
+    
 *   如果指定环境正在运行，或仍处于 `browser/open` / `browser/close` 队列中，该环境返回 `CL_EBUSY`，结果项状态为 `busy`
-
-*   如果请求中任一环境忙碌，顶层 `code` 返回 `CL_EBUSY`；如果存在非法环境 ID 或非法 `cores` 项，顶层 `code` 返回 `CL_EINVALID`
-
+    
+*   如果请求中任一环境忙碌，顶层 `code` 返回 `CL_EBUSY`；如果存在非法环境 ID，顶层 `code` 返回 `CL_EINVALID`
+    
 *   `not_found` 表示该环境本地缓存目录不存在，按清理完成处理
-
+    
 
 ### 5.13 `POST /sdk/v1/token/update`
 
@@ -1223,11 +1154,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   请求体直接转发到后端 `env/create`
-
+    
 *   响应体直接返回后端原始 JSON
-
+    
 *   不追加 BroSDK 自己的 envelope
-
+    
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/create` 接口契约。
 
@@ -1238,9 +1169,9 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   请求体直接转发到后端 `env/update`
-
+    
 *   响应体直接返回后端原始 JSON
-
+    
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/update` 接口契约。
 
@@ -1251,9 +1182,9 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   请求体直接转发到后端 `env/page`
-
+    
 *   响应体直接返回后端原始 JSON
-
+    
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/page` 接口契约。
 
@@ -1264,11 +1195,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   请求体直接转发到后端 `getEnvInfo`
-
+    
 *   响应体直接返回后端原始 JSON
-
+    
 *   SDK 打开浏览器时也会基于该结果构造环境配置，因此这里返回的字段通常比分页列表更完整
-
+    
 
 请求字段：
 
@@ -1295,11 +1226,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   请求体直接转发到后端 `env/destroy`
-
+    
 *   响应体直接返回后端原始 JSON
-
+    
 *   **注意：销毁环境不等于关闭浏览器**。如果该环境的浏览器仍在运行，请先调用 `browser/close` 并等待 `browser-close-success`，再调用 `env/destroy`
-
+    
 
 参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/destroy` 接口契约。
 
@@ -1310,11 +1241,11 @@ WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任
 当前行为：
 
 *   停止 SDK
-
+    
 *   关闭内嵌 Web API 服务
-
+    
 *   销毁当前单例
-
+    
 
 ## 6. 动态库接口参考
 
@@ -1404,13 +1335,13 @@ Cookie 持久化前的拦截回调。
 | `sdk_browser_install` | 异步 | 安装浏览器核心资源 |
 | `sdk_browser_open` | 异步 | 最终 ready 信号是 `browser-open-success` |
 | `sdk_browser_close` | 异步 | 最终关闭完成信号是 `browser-close-success` |
-| `sdk_browser_cleanup` | 同步 | 清理环境 `userdatadir` 缓存和内核下载缓存，返回清理结果 JSON |
+| `sdk_browser_cleanup` | 同步 | 清理指定环境的 `userdatadir` 缓存，返回清理结果 JSON |
 
 `sdk_browser_install` 的请求体与 `/sdk/v1/browser/install` 一致，必须包含 `cores[ ].major`。进度和最终结果通过 `sdk_result_cb_t` 回调返回。
 
 `sdk_browser_open` 的请求体与 `/sdk/v1/browser/open` 一致。`envs[ ]` 对象可携带 `forward` 和 `bridge`；`forward` 是本次启动显式代理，`bridge` 只覆盖本次启动的备用跳板，不修改环境绑定的 `bridgeProxy`。
 
-`sdk_browser_cleanup` 的请求体与 `/sdk/v1/browser/cleanup` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。`envs` 用于清理环境 `userdatadir`，`cores` 用于清理内核下载缓存 `cores/.cache`。运行中或正在打开/关闭队列中的环境会返回 `CL_EBUSY`，结果项状态为 `busy`。
+`sdk_browser_cleanup` 的请求体与 `/sdk/v1/browser/cleanup` 一致，返回的 `out_data` 必须通过 `sdk_free()` 释放。运行中或正在打开/关闭队列中的环境会返回 `CL_EBUSY`，结果项状态为 `busy`。
 
 ### 6.4 环境接口
 
@@ -1429,11 +1360,11 @@ Cookie 持久化前的拦截回调。
 `sdk_register_cookies_storage_cb()` 有三个接入细节需注意：
 
 *   回调接收的是明文 Cookie JSON 数组，而非最终落盘 / 上传的加密二进制
-
+    
 *   若返回替换后的 JSON，SDK 将以该 JSON 继续执行后续加密与持久化
-
+    
 *   Cookie 快照为空时，SDK 也会规范化为 `[ ]` 后触发回调，不静默跳过
-
+    
 
 ### 6.6 内存与辅助接口
 
@@ -1483,28 +1414,28 @@ SDK_API bool SDK_CALL sdk_is_event(int32_t code);
 当前实现中，浏览器关闭后的 Cookie 持久化链路如下：
 
 1.  从浏览器快照提取 Cookie JSON 数组
-
+    
 2.  调用 `sdk_cookies_storage_cb_t`，允许宿主查看或替换明文 JSON
-
+    
 3.  把最终 JSON 转成 Cookie protobuf
-
+    
 4.  使用 `BroEncryptCookiesWithDEK(appId, coKeyVer, coKey, dek)` 加密 Cookie
-
+    
 5.  将加密 envelope 再次打包为 protobuf，并做 `br` 压缩
-
+    
 6.  立即写入本地 SQLite
-
+    
 7.  若为全托管，再异步上传到 OSS
-
+    
 
 Storage 的链路不同：
 
 *   Storage 不走 Cookie 这套 DEK 加密
-
+    
 *   当前实现是按存储策略收集浏览器数据文件，打包后做 `br` 压缩
-
+    
 *   本地 SQLite 与 OSS 持有的是同一份压缩归档
-
+    
 
 ### 7.3 Cookie 在本地与 OSS 中的实际形态
 
@@ -1530,50 +1461,50 @@ Storage 的链路不同：
 当前代码实现不会要求客户自己拼接 Cookie / Storage 对象名：
 
 *   后端返回 `cookieUpPath` / `storageUpPath` 前缀
-
+    
 *   SDK 会自动去掉前导 `/`
-
+    
 *   然后自动追加 `{envId}-v1.br`
-
+    
 
 因此：
 
 *   请勿在接入文档中硬编码旧版的 `cookies.pb` / `storage.zst` 路径模板
-
+    
 *   业务如需记录对象路径，请以后端返回的元数据与 SDK 实际回填结果为准
-
+    
 
 ### 7.5 全托管模式下的本地缓存仲裁
 
 现在本地 SQLite 还会维护以下元数据：
 
 *   `sync_state`
-
+    
 *   `cookie_md5`
-
+    
 *   `storage_md5`
-
+    
 *   `cookie_file_url`
-
+    
 *   `storage_file_url`
-
+    
 *   `last_sync_ms`
-
+    
 *   `updated_ms`
-
+    
 
 浏览器打开时，全托管模式下会按以下规则判断是否直接使用本地 SQLite：
 
 *   `sync_state = Dirty`：说明本地刚关闭过、OSS 可能还未同步，优先使用本地
-
+    
 *   `sync_state = UploadFailed`：说明上次上传失败，优先使用本地
-
+    
 *   后端远端元数据缺失：优先使用本地
-
+    
 *   本地 `md5` / `fileUrl` 与远端一致：优先使用本地
-
+    
 *   其余情况：认为远端更新更可信，回退到 OSS 下载
-
+    
 
 > 全托管模式下，SDK 不盲目信任 SQLite 缓存，而是先做本地 / 远端元数据比对。
 
@@ -1582,57 +1513,57 @@ Storage 的链路不同：
 当全托管模式下 OSS 上传失败时，SDK 不会丢弃数据：
 
 *   本地 SQLite 中会保留 `sync_state = UploadFailed` 状态
-
+    
 *   下次该环境的浏览器启动时，SDK 会检测到 `UploadFailed` 并在生命周期内自动重试上传
-
+    
 *   重试时机：下次浏览器关闭后的持久化流程中
-
+    
 *   因此，即使 OSS 暂时不可用，数据也不会丢失，仅会延迟同步
-
+    
 
 ### 7.6 `browser-close-success` 与上传完成不是同一件事
 
 当前实现中：
 
 *   `browser-close-success` 表示本地快照已经完成、SQLite 已可用于下次启动
-
+    
 *   它不表示 OSS 上传已经完成
-
+    
 *   如果全托管上传失败，本地 SQLite 会保留 `UploadFailed` 状态，后续生命周期仍可重试
-
+    
 
 ## 8. 集成时必须注意的规则
 
 *   先调用 `sdk_register_result_cb()`，再进入异步业务流程
-
+    
 *   把 `sdk_init` 当成进程内全局串行入口
-
+    
 *   对于异步动态库接口，返回 `CL_DONE` 或 `reqId` 都表示“请求已受理”
-
+    
 *   Web API 中 `init`、`info`、`browser/info`、`netdiag`、`browser/cleanup` 与 `env/*` 为同步接口；`browser/install`、`browser/open`、`browser/close`、`token/update` 为异步 ACK
-
+    
 *   Web API 的异步接口必须同时建立 WebSocket，用于接收最终结果
-
+    
 *   浏览器可用的真正信号是 `browser-open-success`
-
+    
 *   `browser-open-success` 是浏览器可用信号；代理桥降级这类“成功但有告警”的情况，`code` 可以是 `CL_WPROXYDEGRADED`，请同时查看后端上报日志的 `level=Warn` 和 `extra.lifecycle`
-
+    
 *   浏览器真正关闭完成的信号是 `browser-close-success`
-
+    
 *   `browser-close-success` 只保证本地持久化完成，不保证 OSS 上传完成
-
+    
 *   如果浏览器是用户手动关闭或进程自行退出，仍可能上报 `browser-close-success`，但 `data.closeReason*` 会说明真实原因
-
+    
 *   `env/*` 接口和 `init/info/browser/*` 的回包包装方式不同，前者是后端原始 JSON 透传；`netdiag` 也是同步原始诊断 JSON；`browser/cleanup` 返回同步清理结果 JSON
-
+    
 *   `env/create`、`env/update`、`env/page`、`env/destroy` 的请求参数与响应字段请以后端对接文档为准，SDK 文档不重复维护
-
+    
 *   如需代理行为稳定可预期，请在创建 / 更新环境时绑定 `proxy`，并在 `browser/open` 中按需传入 `forward` 或 `bridge`；`forward` 可作为本次启动显式代理，`bridgeProxy` 是绑定到环境上的备用前置跳板；勿依赖客户机器隐式系统代理环境
-
+    
 *   `netdiag` 不执行 `browser/open` 策略脚本；诊断 `forward` 或 `bridge` 时，请按启动链路把值映射到 `proxy` 或 `bridgeProxy`，不要假设它会自动读取 `forward` / `bridge`
-
+    
 *   `urls`、`args`、`whiteList`、`blackList`、`extensions`、`cookies` 这类数组字段建议由接入层做长度、条目格式和敏感值校验
-
+    
 
 ## 9. 事件与错误码附录
 
