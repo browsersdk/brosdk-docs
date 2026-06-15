@@ -53,6 +53,9 @@ plugins:
   - search
   - mermaid2
 
+extra_javascript:
+  - assets/javascripts/baidu-analytics.js
+
 # Extensions
 markdown_extensions:
   - admonition
