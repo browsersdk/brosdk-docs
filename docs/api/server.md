@@ -52,6 +52,7 @@ Authorization: Bearer YOUR_API_KEY
 | --- | --- | --- | --- |
 | customerId | string | 是 | 三方用户唯一 ID |
 | duration | integer | 否 | 有效期（秒），默认 86400（1 天），最大 2592000（30 天） |
+| role | string | 否 | 用户角色，默认 `为空`，可选值：`user`、`app` 表示可以管理环境 |
 
 #### 请求示例
 

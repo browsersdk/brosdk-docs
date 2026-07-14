@@ -126,20 +126,14 @@ SDK 在每次浏览器启动前按以下优先级决策网络路径：
 
 ### 端口分配建议
 
-批量启动多个环境时，**每个环境必须使用不同的 CDP 端口**，避免端口冲突：
-
-| 环境 | CDP 端口 |
-| --- | --- |
-| env 1 | 9222 |
-| env 2 | 9223 |
-| env 3 | 9224 |
+批量启动多个环境时，**每个环境可以自动分配 CDP 端口**，避免端口冲突：
 
 ```json
 {
   "envs": [
-    { "envId": "1111111111111111111", "args": ["--remote-debugging-port=9222", "--remote-allow-origins=*"] },
-    { "envId": "2222222222222222222", "args": ["--remote-debugging-port=9223", "--remote-allow-origins=*"] },
-    { "envId": "3333333333333333333", "args": ["--remote-debugging-port=9224", "--remote-allow-origins=*"] }
+    { "envId": "1111111111111111111", "args": ["--remote-debugging-port=0"] },
+    { "envId": "2222222222222222222", "args": ["--remote-debugging-port=0"] },
+    { "envId": "3333333333333333333", "args": ["--remote-debugging-port=0"] }
   ]
 }
 ```
