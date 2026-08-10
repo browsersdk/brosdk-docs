@@ -1406,11 +1406,12 @@ Web API 使用标准 BroSDK envelope，诊断对象位于 `data.systemProxy`：
 | `count`          | integer          | 否   | `3`                           | 顺序检测次数，范围 `1..20`                                                                                         |
 | `timeoutMs`      | integer          | 否   | `5000`                        | 单次检测超时，范围 `100..10000` 毫秒                                                                               |
 | `includeBody`    | boolean          | 否   | `false`                       | 是否在成功结果中返回响应正文                                                                                       |
+| `verifyTls`      | boolean          | 否   | `true`                        | HTTPS 是否校验证书链和主机名；仅在排查受控测试证书时使用 `false`                                                     |
 | `totalTimeoutMs` | integer          | 否   | `min(25000, count*timeoutMs)` | 总超时，显式传入时范围为 `1..25000` 毫秒；省略时按默认值计算                                                       |
 | `forward`        | string           | 否   | 不覆盖                        | 本次诊断使用的显式跳板代理；支持 `http`、`socks5`、`socks5h`。传入后只覆盖临时 bridge，不修改环境配置              |
 | `detailLevel`    | string           | 否   | `standard`                    | `summary` 省略逐次结果和候选节点，`standard` 返回结构化诊断，`debug` 额外返回原始 `transport` 与 bridge 运行时证据 |
 
-`includeBody=true` 时，`data.lastResponse` 返回最近一次成功请求的状态码和正文，最多 64 KiB。正文只返回一次，不在每个 `attempt` 中重复，也不由 SDK 解释；例如出口 IP 检测 URL 返回 IP 文本时，由调用方自行解析。正文可能包含 Cookie、Token 或个人信息，默认不要开启，并避免把返回值写入普通日志。
+`includeBody=true` 时，SDK 仍发送 GET，但只在请求正文明确开启时读取并返回正文；`data.lastResponse` 返回最近一次成功请求的状态码和正文，最多 64 KiB。`bodyTruncated=true` 表示达到正文上限，不能据此推断正文完整。正文只返回一次，不在每个 `attempt` 中重复，也不由 SDK 解释；例如出口 IP 检测 URL 返回 IP 文本时，由调用方自行解析。正文可能包含 Cookie、Token 或个人信息，默认不要开启，并避免把返回值写入普通日志。
 
 返回的 `data` 按职责分组：`environment` 表示环境状态；`request` 回显实际参数；`result` 返回机器可判定的聚合结果；`diagnosis` 返回故障层、稳定错误码、置信度和建议是否重试；`network` 返回本地网络和临时路由证据；`attempts` 返回逐次结果。`environment.configFetched=true` 表示已经从服务端获取环境配置。
 
@@ -1418,9 +1419,13 @@ Web API 使用标准 BroSDK envelope，诊断对象位于 `data.systemProxy`：
 
 `network.local` 是调用时重新读取的本机网络摘要，其中 `systemProxy.enabled` 表示系统代理是否开启，`systemProxy.address` 返回固定代理或 PAC 地址；还包括出口网卡、默认网关和 TUN/VPN 状态。地址和认证信息均按日志安全规则脱敏。
 
+`network.observation.startEpoch/endEpoch` 是诊断开始和结束时的网络状态版本；`changedDuringRun=true` 时，运行期间发生了网络/VPN/系统代理切换，`result.inconclusive=true` 且不应把本次结果作为稳定基线。
+
 `network.route.selected.name` 是选中的逻辑链路，例如 `systemProxy->proxy`；`chain` 是适合展示的节点数组；`dynamic=true` 表示备用链路或 bypass 可能让单次连接使用不同路径，`reasonCode` 给出机器可读原因。`verification.status` 使用 `passed`、`failed`、`not_run`，不再使用含义不明确的 nullable boolean。`nodes` 和 `candidates` 保留节点与候选链路证据。
 
-`diagnosis.layer` 可能为 `none`、`request`、`route`、`system_proxy`、`forward`、`proxy`、`bridge_proxy`、`target_connect`、`tls`、`http`、`timeout`、`multiple` 或 `unknown`。代理认证、目标不可达、TLS、HTTP 状态错误和间歇失败都使用稳定的 `diagnosis.code`。每个 `attempt.error` 使用相同的 `layer/code/message/retryable` 结构；只有 `detailLevel=debug` 才返回原始 `transport` 和 `bridgeRuntime`。
+临时诊断路由的 `browserParity` 固定为 `configured_subset`，表示它复现环境配置和选路候选，但不执行 Chromium 启动参数、浏览器代理策略脚本或运行中 bridge 状态；这些边界列在 `parityLimitations` 中。
+
+`diagnosis.layer` 可能为 `none`、`request`、`route`、`system_proxy`、`forward`、`proxy`、`bridge_proxy`、`target_connect`、`tls`、`http`、`timeout`、`multiple` 或 `unknown`。代理认证、目标不可达、TLS、HTTP 状态错误和间歇失败都使用稳定的 `diagnosis.code`。证书过期、未生效、主机名不匹配、证书不受信和 CA 库不可用分别使用 `TLS_CERTIFICATE_EXPIRED`、`TLS_CERTIFICATE_NOT_YET_VALID`、`TLS_HOSTNAME_MISMATCH`、`TLS_CERTIFICATE_UNTRUSTED`、`TLS_CA_STORE_UNAVAILABLE`。每个 `attempt.error` 使用相同的 `layer/code/message/retryable` 结构；只有 `detailLevel=debug` 才返回原始 `transport` 和 `bridgeRuntime`。
 
 #### 5.19.1 先按层级判读，不要只看 `code`
 
@@ -1492,6 +1497,7 @@ attempt.error.layer=route/timeout       -> 检查链路连接、超时和瞬态�
   "count": 3,
   "timeoutMs": 5000,
   "includeBody": true,
+  "verifyTls": true,
   "totalTimeoutMs": 15000,
   "detailLevel": "standard"
 }
@@ -1507,6 +1513,7 @@ $body = @{
   timeoutMs = 5000
   totalTimeoutMs = 15000
   includeBody = $true
+  verifyTls = $true
   detailLevel = "standard"
 } | ConvertTo-Json
 
@@ -1719,6 +1726,7 @@ function diagnoseEnvironmentNetwork(apiResult):
       "timeoutMs": 5000,
       "totalTimeoutMs": 15000,
       "includeBody": true,
+      "verifyTls": true,
       "forwardOverride": false,
       "detailLevel": "standard"
     },
@@ -1729,6 +1737,8 @@ function diagnoseEnvironmentNetwork(apiResult):
       "anySucceeded": true,
       "allSucceeded": true,
       "timedOut": false,
+      "inconclusive": false,
+      "cleanupTimedOut": false,
       "attempted": 3,
       "succeeded": 3,
       "failed": 0,
@@ -1745,12 +1755,24 @@ function diagnoseEnvironmentNetwork(apiResult):
     },
     "network": {
       "schemaVersion": "brosdk-env-netdiag-network-v2",
+      "observation": {
+        "startEpoch": 42,
+        "endEpoch": 42,
+        "changedDuringRun": false,
+        "basis": "start_snapshot"
+      },
       "local": {
         "connectionType": "Direct",
         "systemProxy": { "enabled": false, "address": "" }
       },
       "route": {
         "source": "temporary_bridge",
+        "browserParity": "configured_subset",
+        "parityLimitations": [
+          "chromium_proxy_args",
+          "browser_proxy_policy_script",
+          "running_bridge_runtime_state"
+        ],
         "selected": {
           "name": "direct",
           "chain": ["direct"],
@@ -1791,7 +1813,7 @@ function diagnoseEnvironmentNetwork(apiResult):
       "status": 200,
       "body": "response body returned by the URL",
       "bodyBytes": 33,
-      "bodyMayBeTruncated": false
+      "bodyTruncated": false
     }
   }
 }
@@ -1801,24 +1823,54 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 - 顶层 `code` 是 SDK 业务码，`0` 表示诊断任务成功执行；`msg` 是简短说明；`ok=true` 表示 SDK 已完成诊断。它们不代表目标网站一定返回 2xx/3xx，目标访问结论必须读取 `data.result`。
 - `data.environment` 描述本地 SDK 对该环境的生命周期视图：`id` 是环境 ID；环境没有进入本地浏览器注册表时为 `NotLoaded`，否则 `status` 可能是 `Idle`、`Downloading`、`Preparing`、`Starting`、`Started`、`Stopping`、`Stopped`、`Destroyed`、`StartFailed`、`StopFailed` 或 `Unknown`；`running` 表示本地浏览器进程是否运行；`configFetched=true` 表示已成功从服务端取得环境配置。该状态不是服务端环境有效性的替代判断。
-- `data.request` 是实际生效参数回显：`url` 为检测地址；`count` 为计划次数；`timeoutMs` 为单次超时；`totalTimeoutMs` 为总超时；`includeBody` 表示是否请求响应正文；`forwardOverride` 表示本次是否用请求中的 `forward` 覆盖环境配置；`detailLevel` 为 `summary`、`standard` 或 `debug`。代理认证信息不会通过回显字段返回。
+- `data.request` 是实际生效参数回显：`url` 为检测地址；`count` 为计划次数；`timeoutMs` 为单次超时；`totalTimeoutMs` 为总超时；`includeBody` 表示是否请求响应正文；`verifyTls` 表示是否校验证书链和主机名；`forwardOverride` 表示本次是否用请求中的 `forward` 覆盖环境配置；`detailLevel` 为 `summary`、`standard` 或 `debug`。代理认证信息不会通过回显字段返回。
 
 `data.result` 是给程序判断的汇总结果：
 
+兼容性说明：原有汇总字段没有删除或改名；当前版本新增 `inconclusive` 和 `cleanupTimedOut`，并可能在诊断期间网络切换时返回 `outcome="inconclusive"`。调用方应忽略不认识的新增字段，并为未知 `outcome` 保留兜底分支。
+
 | 字段               | 含义                                                                                                                                                                                                                                                                                      |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `outcome`          | 总体结论，常见值为 `healthy`（全部成功）、`degraded`（部分成功）、`http_error`（目标返回 4xx/5xx）、`http_transport_failed`、`target_unreachable`（目标连接失败）、`proxy_auth_failed`、`proxy_handshake_failed`、`route_failed`、`tls_failed`、`timeout`、`invalid_request`、`unknown`。 |
+| `outcome`          | 总体结论。各取值的失败阶段和代理链路含义见下表；调用方应允许未来新增值。                                                                                                                                                                                                                    |
 | `targetReachable`  | 至少一次已经通过临时 bridge 连接到目标主机端口。                                                                                                                                                                                                                                          |
 | `httpResponded`    | 至少一次收到合法 HTTP 状态码 `100..599`。                                                                                                                                                                                                                                                 |
 | `anySucceeded`     | 至少一次收到 HTTP 2xx/3xx。                                                                                                                                                                                                                                                               |
 | `allSucceeded`     | 所有计划请求都收到 HTTP 2xx/3xx，并且没有总超时。                                                                                                                                                                                                                                         |
 | `timedOut`         | 总诊断期限到期，导致部分计划请求没有执行。单次超时还需查看对应 `attempt.outcome`。                                                                                                                                                                                                        |
+| `inconclusive`     | 运行期间网络 epoch 发生变化，当前结果只代表变化前后的混合观测。                                                                                                                                                                                                                           |
+| `cleanupTimedOut`  | 临时 bridge 未能在总期限内完全停止；其所有权已进入受控回收队列，目标结论仍应结合 `inconclusive` 判断。                                                                                                                                                                                     |
 | `attempted`        | 实际执行的请求次数。                                                                                                                                                                                                                                                                      |
 | `succeeded`        | HTTP 2xx/3xx 的请求次数。                                                                                                                                                                                                                                                                 |
 | `failed`           | 已执行但没有得到成功 HTTP 响应的次数，包括 HTTP 错误和传输错误。                                                                                                                                                                                                                          |
 | `skipped`          | 因总超时或总期限耗尽而未执行的次数。                                                                                                                                                                                                                                                      |
 | `elapsedMs`        | 整个诊断的实际耗时。                                                                                                                                                                                                                                                                      |
 | `successLatencyMs` | 仅使用成功请求统计延迟；`samples` 是样本数，`min`、`max`、`avg` 分别是最小、最大、平均毫秒数。没有成功样本时这三个值为 `null`。                                                                                                                                                           |
+
+`result.outcome` 的取值按检测推进到的阶段解释：
+
+| `outcome`                | 停止或失败阶段            | 对代理链路和目标的含义                                                                                                      |
+| ------------------------ | ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `healthy`                | 全流程完成                | 所有计划请求均得到 2xx/3xx；本次代理链路、目标连接和 HTTP 请求均正常。                                                      |
+| `degraded`               | 多次请求结果不一致        | 至少一次完整成功，证明链路曾经正常，但存在间歇失败或超时；不能判为稳定正常。                                                |
+| `http_error`             | 目标 HTTP 响应            | 代理链路和目标连接已完成，并收到合法 HTTP 状态；只是目标返回 4xx/5xx。应按状态码处理，不要报“代理不可达”。                  |
+| `http_transport_failed`  | HTTP 请求或响应传输       | 已进入 HTTP 阶段但没有收到合法状态行。若 `targetReachable=true`，说明代理已连到目标端口，问题位于目标响应或后续传输。        |
+| `target_unreachable`     | 代理到目标的 CONNECT      | 代理入口和协议链路已建立到可以返回 CONNECT 错误，但代理出口无法连接目标网络、主机或端口；不等同于代理认证或握手失败。       |
+| `tls_failed`             | 目标 TLS 握手或证书校验   | 代理已连接目标端口，但 HTTPS 握手、证书链或主机名校验失败；代理链路通常不是首要故障点。                                     |
+| `proxy_auth_failed`      | 某个代理节点认证          | 代理凭据或认证方式错误，尚未到达目标；不能认为代理链路正常。                                                                |
+| `proxy_handshake_failed` | 某个代理节点协议握手      | 代理协议、地址、端口或服务不匹配，尚未到达目标；不能认为代理链路正常。                                                      |
+| `route_failed`           | 临时 bridge 或代理路由    | 在目标 CONNECT 前链路失败；结合 `diagnosis.layer` 和 `network.route.failure` 定位系统代理、forward、proxy 或 bridgeProxy。 |
+| `timeout`                | 路由、TLS、HTTP 或总期限  | 仅说明某阶段超时；读取 `diagnosis.layer/code` 判断是否已到达目标，不能单凭该值认定代理正常或异常。                           |
+| `invalid_request`        | 请求参数校验              | URL 或参数无效，网络检测没有形成有效结论；修正参数后再调用。                                                                |
+| `inconclusive`           | 诊断期间本机网络发生变化  | VPN、系统代理或出口路由在运行中切换，观测混合了不同网络状态；等待网络稳定后重试。                                           |
+| `unknown`                | 证据不足                  | 没有足够证据归类；保留原始结果并结合 `diagnosis`、`attempts` 和日志排查。                                                   |
+
+程序判断“代理链路正常但目标有问题”时，不应只看 `outcome`。`httpResponded=true` 是最强证据，表示链路已到达目标应用并收到 HTTP 响应；`targetReachable=true` 表示至少已连接目标端口。典型组合如下：
+
+| 条件 | 结论 |
+| ---- | ---- |
+| `httpResponded=true` 且 `anySucceeded=false` | 代理链路已通，目标返回 4xx/5xx；读取 `attempts[].http.status`。 |
+| `targetReachable=true` 且 `httpResponded=false` | 代理已连到目标端口，但 TLS、HTTP 响应或后续传输失败；读取 `diagnosis.layer`。 |
+| `targetReachable=false` | 尚未证明目标端口可达；继续区分代理认证、代理握手、路由和目标 CONNECT 失败。 |
 
 因此，HTTP 404 不是代理网络失败：通常会得到 `targetReachable=true`、`httpResponded=true`、`anySucceeded=false`，并且 `diagnosis.layer="http"`。只有目标连接本身失败，才应按目标不可达处理。
 
@@ -1843,6 +1895,8 @@ function diagnoseEnvironmentNetwork(apiResult):
 | `HTTP_STATUS_ERROR`                               | 目标返回 4xx/5xx                              | 按 `attempts[].http.status` 处理；408、425、429 和 5xx 通常可重试，其余通常先修正请求或权限 |
 | `HTTP_RESPONSE_TIMEOUT` / `HTTP_TRANSPORT_FAILED` | 已进入 HTTP 阶段但未收到有效响应              | 检查目标响应时间、中间链路和超时设置                                                        |
 | `TLS_HANDSHAKE_TIMEOUT` / `TLS_HANDSHAKE_FAILED`  | 目标 CONNECT 后 TLS 失败                      | 检查目标证书、SNI、时间、TLS 拦截和代理协议                                                 |
+| `TLS_CERTIFICATE_EXPIRED` / `TLS_CERTIFICATE_NOT_YET_VALID` / `TLS_HOSTNAME_MISMATCH` | 证书有效期或主机名校验失败 | 修正目标证书、系统时间或访问主机名，不要关闭校验 |
+| `TLS_CERTIFICATE_UNTRUSTED` / `TLS_CA_STORE_UNAVAILABLE` | 系统信任链不接受证书或 CA 库不可用 | 修复系统根证书或受控测试配置；生产调用保持 `verifyTls=true` |
 | `TARGET_*`                                        | SOCKS5 已接管，但目标网络、主机或端口连接失败 | 检查目标 DNS/地址/端口和代理出口策略                                                        |
 | `PROXY_AUTHENTICATION_FAILED`                     | 某代理节点认证失败                            | 不自动盲重试；修复凭据或认证方式                                                            |
 | `PROXY_HANDSHAKE_FAILED`                          | 某代理节点协议握手失败                        | 检查 scheme、host、port 和节点协议                                                          |
@@ -1890,9 +1944,9 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 `route.candidates[]` 的 `role` 是候选链路名；`result` 可为 `selected`、`reachable`、`failed`、`skipped` 或 `selected_unverified`；`attempted` 表示是否探测；`reachable` 表示端点握手是否成功；`tcpReachable` 表示 TCP 是否可达；`handshakeAttempted` 和 `authAttempted` 表示是否进入协议握手和认证；`protocol` 例如为 `socks5` 或 `http`；`error` 为底层错误；`skipReason` 为跳过原因；`socks5Reply=0` 表示 SOCKS5 CONNECT 成功；`socks5Method=0` 表示无认证、`2` 表示用户名密码认证；`authStatus=0` 表示认证成功。`endpoint`、`preceding` 和其中的 `raw` 地址会脱敏。
 
-`data.attempts[]` 保存逐次检测：`index` 从 1 开始；`outcome` 可为 `success`、`http_error`、`target_unreachable`、`tls_failed`、`http_transport_failed`、`timeout`、`invalid_request` 或 `route_failed`；`durationMs` 是单次耗时；`targetConnected` 表示是否连上目标；`http.status` 是目标 HTTP 状态；`http.successful` 表示是否为 2xx/3xx；`headerBytes`、`bodyBytes` 是大小；`bodyMayBeTruncated` 表示是否达到 body 限制；失败时的 `error` 使用与顶层诊断相同的 `layer/code/message/retryable` 结构。`transport` 和 `bridgeRuntime` 只在 `detailLevel=debug` 返回。
+`data.attempts[]` 保存逐次检测：`index` 从 1 开始；`outcome` 可为 `success`、`http_error`、`target_unreachable`、`tls_failed`、`http_transport_failed`、`timeout`、`invalid_request` 或 `route_failed`；`durationMs` 是单次耗时；`targetConnected` 表示是否连上目标；`http.status` 是目标 HTTP 状态；`http.successful` 表示是否为 2xx/3xx；`headerBytes`、`bodyBytes` 是大小；`http.tlsCertificateVerified` 表示 HTTPS 证书是否完成校验；`http.bodyTruncated` 表示正文是否达到限制；失败时的 `error` 使用与顶层诊断相同的 `layer/code/message/retryable` 结构。`transport` 和 `bridgeRuntime` 只在 `detailLevel=debug` 返回。
 
-`data.lastResponse` 只在 `includeBody=true` 且至少一次请求返回 2xx/3xx 时出现。`status` 是最近一次成功状态码；`body` 是最多 64 KiB 的正文；`bodyBytes` 是正文字节数；`bodyMayBeTruncated` 表示是否可能截断。body 不会在每个 attempt 中重复，也不会由 SDK 解析。
+`data.lastResponse` 只在 `includeBody=true` 且至少一次请求返回 2xx/3xx 时出现。`status` 是最近一次成功状态码；`body` 是最多 64 KiB 的正文；`bodyBytes` 是正文字节数；`bodyTruncated` 表示是否截断。body 不会在每个 attempt 中重复，也不会由 SDK 解析。
 
 #### 5.19.4 常见结果示例
 
@@ -1976,7 +2030,7 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 #### 5.19.5 推荐调用配置
 
-- 普通连通性：`count=1`、`includeBody=false`、`detailLevel=summary`，适合 UI 快速检查。
+- 普通连通性：`count=1`、`includeBody=false`、`verifyTls=true`、`detailLevel=summary`，适合 UI 快速检查。
 - 稳定性检查：`count=3..5`、`detailLevel=standard`。当 `count*timeoutMs <= 25000` 时，可让 `totalTimeoutMs` 覆盖全部单次超时；超过上限时要接受部分请求因总期限而 `skipped`。
 - 需要排查某个节点：使用 `detailLevel=debug`，只在受控诊断界面展示，避免把原始传输错误写入业务日志。
 - 需要确认出口内容：`includeBody=true`，调用方读取 `lastResponse.body` 并自行解析；SDK 不猜测出口 IP、JSON 或文本含义。
