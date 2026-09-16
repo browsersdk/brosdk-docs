@@ -2,6 +2,29 @@
 
 > **当前版本：v2.1.0.2 最后更新：2026-08-09** 本文档是 BroSDK 的统一接入参考文档。内容覆盖动态库接口与 Web API；行为以当前版本源码和 `brosdk.h` 公开接口为准。
 
+## 目录
+
+- [1. 概述](#1-概述)
+- [2. 平台支持](#2-平台支持)
+- [3. 通用约定](#3-通用约定)：JSON 与编码、内存管理、返回值与 `reqId`、异步回调语义、同步响应 Envelope、异步 ACK Envelope、生命周期通知结构
+- [4. 代理字段与当前策略](#4-代理字段与当前策略)：字段口径、决策规则、重要说明、故障与回退
+- [5. Web API 参考](#5-web-api-参考)
+  - 5.1 启用方式 / 5.2 认证模型 / 5.3 WebSocket 使用说明 / 5.4 同步与异步接口
+  - 生命周期：5.5 `init`、5.6 `info`、5.14 `token/update`、5.22 `shutdown`
+  - 诊断：5.7 `netdiag`、5.7.2 `proxydiag`、5.20 `env/netdiag`
+  - 浏览器：5.8 `browser/info`、5.9 内核更新检查、5.10 `browser/install`、5.11 `browser/open`、5.12 `browser/close`、5.13 `browser/cleanup`
+  - 环境与 Cookie：5.15 `env/create`、5.16 `env/update`、5.17 `env/page`、5.18 `env/getinfo`、5.19 `env/getcookiehistory`、5.21 `env/destroy`
+- [6. 动态库接口参考（C ABI）](#6-动态库接口参考c-abi)
+  - 6.1 接口总览与调用约定（全部导出接口索引）
+  - 6.2 核心类型与回调 / 6.3 通用调用契约
+  - 6.4 生命周期、注册与信息 / 6.5 浏览器接口 / 6.6 环境接口 / 6.7 Cookie 接口
+  - 6.8 诊断接口 / 6.9 内存与辅助接口 / 6.10 关键流程示例
+- [7. Cookie 与 Storage 持久化语义](#7-cookie-与-storage-持久化语义)
+- [8. 集成时必须注意的规则](#8-集成时必须注意的规则)
+- [9. 事件与错误码附录](#9-事件与错误码附录)
+
+接入路径建议：动态库接入先看 3 → 6.1 → 6.4 → 6.5；Web API 接入先看 3 → 5.1 → 5.5 → 5.11。两种方式的请求体字段一致，差异在结果交付方式。
+
 ## 1. 概述
 
 BroSDK 是一个使用 C/C++ 实现的浏览器环境管理 SDK，对外提供两种接入方式：
@@ -420,7 +443,7 @@ network:
 
 WebSocket 是 Web API 的异步事件通道。调用异步接口（`browser/install`、`browser/open`、`browser/close`、`token/update`）时，HTTP 响应只返回受理 ACK；最终进度与结果通过 WebSocket 推送。
 
-#### 连接地址
+#### 5.3.1 连接地址
 
 ```plaintext
 ws://127.0.0.1:{port}/
@@ -430,7 +453,7 @@ ws://127.0.0.1:{port}/
 
 当前实现不区分连接 path，`/` 与任意子路径均可接受。
 
-#### 消息格式
+#### 5.3.2 消息格式
 
 - 帧类型：UTF-8 JSON 文本帧
 
@@ -438,11 +461,11 @@ ws://127.0.0.1:{port}/
 
 - 常规 SDK 事件通常包含 `type`（事件名称）、`code`（返回码）和 `reqId` 字段；异常响应可能只在 `data` 中携带错误信息
 
-#### 请求与事件关联
+#### 5.3.3 请求与事件关联
 
 HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件。若 `reqId` 为 `0`，不要依赖它做精确关联，应结合 `type`、`envId` 和业务上下文判断事件归属。
 
-#### 连接生命周期
+#### 5.3.4 连接生命周期
 
 | 场景                     | 行为                                                   |
 | ------------------------ | ------------------------------------------------------ |
@@ -452,7 +475,7 @@ HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件。若 `
 | 客户端断开               | SDK 不缓冲断线期间的事件；重连后可再次收到运行状态快照 |
 | SDK shutdown             | SDK 主动关闭所有 WebSocket 连接                        |
 
-#### 推荐接入顺序
+#### 5.3.5 推荐接入顺序
 
 1.  `sdk_init` 返回成功
 
@@ -464,7 +487,7 @@ HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件。若 `
 
 5.  通过 WebSocket 接收最终事件，如 `browser-open-success` 或 `browser-open-failed`
 
-#### 主动推送事件
+#### 5.3.6 主动推送事件
 
 以下事件由 SDK 主动推送，不需要客户端先发起请求：
 
@@ -474,7 +497,7 @@ HTTP ACK 中的 `reqId > 0` 时，可用于匹配后续 WebSocket 事件。若 `
 | `sdk-token-expired`                         | token 已过期                       |
 | `browser-close-success`（含 `closeOrigin`） | 浏览器进程意外退出或被用户手动关闭 |
 
-#### 通过 WebSocket 发送请求
+#### 5.3.7 通过 WebSocket 发送请求
 
 WebSocket 帧中可包含带 `path` 字段的请求体，SDK 会按异步任务调度处理。当前实现所有 WebSocket 请求均视为异步，不区分同步接口语义。接入侧建议统一使用“HTTP 请求 + WebSocket 监听”的模式，语义更清晰。
 
@@ -815,6 +838,17 @@ Web API 使用标准 BroSDK envelope，诊断对象位于 `data.systemProxy`：
 }
 ```
 
+响应字段：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `data.envs` | array | 当前可被 CDP 接管的环境列表；没有运行中的环境时为空数组 |
+| `data.envs[].envId` | string | 环境 ID，十进制字符串 |
+| `data.envs[].remoteDebuggingPort` | integer | 该环境 Chromium 的 CDP 远程调试端口 |
+| `data.eventId` | integer | 固定 `20116`（`browser-info-success`） |
+
+只有正在启动、或已启动且进程仍存活的环境会出现在列表里；已退出但状态未回收的环境不会列出。C ABI 的 `sdk_browser_info` 返回的是**裸数组**（没有 `envs` 外层与 envelope），两条路径的响应形状不同，详见 6.5.4。
+
 ### 5.9 内核更新检查（无 HTTP 端点）
 
 内核更新检查只有 C ABI 接口 `sdk_browser_core_check`，**没有对应的 Web API 端点**。它同步比较指定内核与 SDK 初始化时取得的远端核心目录，只读——不下载、不解压、不修改内核文件，也不受 `autoUpdateKernel` 开关限制；该开关只决定浏览器启动时是否自动执行更新。
@@ -827,11 +861,14 @@ Web API 使用标准 BroSDK envelope，诊断对象位于 `data.systemProxy`：
 
 请求字段：
 
-| 字段    | 类型  | 必填 | 说明                     |
-| ------- | ----- | ---- | ------------------------ |
-| `cores` | array | 是   | 需要安装的浏览器核心列表 |
+| 字段 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `cores` | array\<object\> | 是 | — | 需要安装的浏览器核心列表；空数组返回 `CL_EINVALID` |
+| `cores[].major` | integer / string | 是 | — | 核心主版本号，例如 `134`；`<= 0` 的条目被丢弃 |
+| `cores[].type` | string | 否 | `chrome` | 内核类型 |
+| `cores[].kernelId` | string | 否 | — | `type` 的等价别名，两者同时存在时 `kernelId` 生效 |
 
-| `cores[ ].major` | integer / string | 是 | 浏览器核心主版本号，例如 `134` |
+同一 `type` + `major` 的重复条目会自动去重。
 
 请求示例：
 
@@ -1312,41 +1349,62 @@ Web API 使用标准 BroSDK envelope，诊断对象位于 `data.systemProxy`：
 
 ### 5.15 `POST /sdk/v1/env/create`
 
-同步创建环境。
+同步创建环境。SDK 在这条链路上只做转发，不解析业务字段。
 
-当前行为：
+SDK 侧参数处理：
 
-- 请求体直接转发到后端 `env/create`
+| 项目 | 行为 |
+| --- | --- |
+| 请求体 | **整体原样转发**到后端 `env/create`，SDK 不新增、不删除、不改写任何字段 |
+| SDK 必填字段 | 无。空请求体（长度 0）会在进入转发前返回 `CL_EINVALID` |
+| 业务字段 | 由服务端契约定义（环境名称、指纹、代理等），本文不维护 |
+| 响应体 | 后端原始 JSON 透传，不包裹 BroSDK 的 `code/reqId/type/data` envelope |
 
-- 响应体直接返回后端原始 JSON
+前置条件与返回码：
 
-- 不追加 BroSDK 自己的 envelope
+| 返回码 | 触发条件 |
+| --- | --- |
+| `CL_ENOTINITIALIZED` | `sdk_init` 未成功，缺少后端凭据 |
+| `CL_EINVALID` | 请求体为空 |
+| `CL_EHTTP_POST` | 后端不可达，或 HTTP 状态非 2xx |
+| `CL_OK` | HTTP 调用成功 |
 
-参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/create` 接口契约。
+**重要**：HTTP 调用成功即返回 `CL_OK`，后端业务失败（响应体里的业务 `code` 非 0）只记录日志、**不改变返回码**。接入方必须解析响应体里的业务 `code`/`msg` 判定成败，不能只看 HTTP 层返回码。
 
 ### 5.16 `POST /sdk/v1/env/update`
 
 同步更新环境。
 
-当前行为：
+SDK 侧参数处理：
 
-- 请求体直接转发到后端 `env/update`
+| 项目 | 行为 |
+| --- | --- |
+| 请求体 | 原样转发到后端 `env/update`，仅对 `envId` 做类型归一化 |
+| `envId` | 可传十进制字符串或数字；若传数字，SDK 会在出网前改写成**字符串**形式 |
+| 业务字段 | 由服务端契约定义，本文不维护 |
+| 响应体 | 后端原始 JSON 透传 |
 
-- 响应体直接返回后端原始 JSON
+请求示例（`envId` 之外的字段按服务端契约填写）：
 
-参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/update` 接口契约。
+```json
+{ "envId": "2062428528552448000", "envName": "示例环境" }
+```
+
+返回码与 5.15 相同，另外请求体不是合法 JSON 时返回 `CL_EINVALID`（该接口会解析 JSON 以便归一化 `envId`）。业务失败同样只在响应体里体现。
 
 ### 5.17 `POST /sdk/v1/env/page`
 
 同步分页查询环境。
 
-当前行为：
+SDK 侧参数处理：
 
-- 请求体直接转发到后端 `env/page`
+| 项目 | 行为 |
+| --- | --- |
+| 请求体 | **整体原样转发**到后端 `env/page`，分页字段（页码、页大小、过滤条件）全部由服务端定义 |
+| SDK 必填字段 | 无。空请求体返回 `CL_EINVALID` |
+| 响应体 | 后端原始 JSON 透传 |
 
-- 响应体直接返回后端原始 JSON
-
-参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/page` 接口契约。
+返回码与 5.15 相同；业务失败只在响应体里体现。
 
 ### 5.18 `POST /sdk/v1/env/getinfo`
 
@@ -1443,7 +1501,7 @@ SDK 实例级别，不是机器级别；不同进程会分别计数。
 
 `diagnosis.layer` 可能为 `none`、`request`、`route`、`system_proxy`、`forward`、`proxy`、`bridge_proxy`、`target_connect`、`tls`、`http`、`timeout`、`multiple` 或 `unknown`。代理认证、目标不可达、TLS、HTTP 状态错误和间歇失败都使用稳定的 `diagnosis.code`。证书过期、未生效、主机名不匹配、证书不受信和 CA 库不可用分别使用 `TLS_CERTIFICATE_EXPIRED`、`TLS_CERTIFICATE_NOT_YET_VALID`、`TLS_HOSTNAME_MISMATCH`、`TLS_CERTIFICATE_UNTRUSTED`、`TLS_CA_STORE_UNAVAILABLE`。每个 `attempt.error` 使用相同的 `layer/code/message/retryable` 结构；只有 `detailLevel=debug` 才返回原始 `transport` 和 `bridgeRuntime`。
 
-#### 5.19.1 先按层级判读，不要只看 `code`
+#### 5.20.1 先按层级判读，不要只看 `code`
 
 `env/netdiag` 的顶层 `code=0` 只表示“诊断任务已经执行并返回结果”，不表示目标 URL 一定成功。推荐按下面顺序处理：
 
@@ -1479,7 +1537,7 @@ else:
     inspect diagnosis, route.failure, candidates[].failure, and attempts[].error
 ```
 
-#### 5.19.2 按候选链路和节点定位问题
+#### 5.20.2 按候选链路和节点定位问题
 
 `network.route.selected.chain` 是展示用的链路顺序，例如 `["systemProxy", "proxy"]`；它表示请求从本机经过系统代理再到最终代理。`nodes` 和 `candidates` 提供证据，但不要把“配置存在”当成“节点可用”：
 
@@ -1542,7 +1600,7 @@ Invoke-RestMethod `
 
 接入侧应保存原始 `data`，而不是只保存一行 `msg`：先用 `result` 给出健康/失败结论，再用 `diagnosis` 和 `network.route` 生成排障信息；需要展示出口内容时才读取 `lastResponse.body`。
 
-#### 5.19.3 响应判定与诊断输出伪代码
+#### 5.20.3 响应判定与诊断输出伪代码
 
 下面的伪代码描述调用方拿到响应后如何判断和输出结果，不描述 SDK 内部如何创建 bridge。Web API 使用 HTTP 响应体作为输入；C API 使用 `sdk_env_netdiag` 的返回码和 `out_data` 作为输入，两者随后使用同一套判定逻辑。
 
@@ -1964,7 +2022,7 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 `data.lastResponse` 只在 `includeBody=true` 且至少一次请求返回 2xx/3xx 时出现。`status` 是最近一次成功状态码；`body` 是最多 64 KiB 的正文；`bodyBytes` 是正文字节数；`bodyTruncated` 表示是否截断。body 不会在每个 attempt 中重复，也不会由 SDK 解析。
 
-#### 5.19.4 常见结果示例
+#### 5.20.4 常见结果示例
 
 **目标已到达，但返回 HTTP 错误**：
 
@@ -2044,7 +2102,7 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 **执行失败**：例如环境不存在或 `getEnvInfo` 失败时，顶层 `ok=false`，`data.error` 给出 SDK 层原因；这与“目标返回 404/500”不同，通常不会有 `result`、`attempts` 或 `lastResponse`。调用方应把这类结果归入 SDK/环境配置错误。
 
-#### 5.19.5 推荐调用配置
+#### 5.20.5 推荐调用配置
 
 - 普通连通性：`count=1`、`includeBody=false`、`verifyTls=true`、`detailLevel=summary`，适合 UI 快速检查。
 - 稳定性检查：`count=3..5`、`detailLevel=standard`。当 `count*timeoutMs <= 25000` 时，可让 `totalTimeoutMs` 覆盖全部单次超时；超过上限时要接受部分请求因总期限而 `skipped`。
@@ -2060,27 +2118,30 @@ function diagnoseEnvironmentNetwork(apiResult):
 
 同步销毁环境。
 
-当前行为：
+SDK 侧参数处理：
 
-- 请求体直接转发到后端 `env/destroy`
+| 项目 | 行为 |
+| --- | --- |
+| 请求体 | 原样转发到后端 `env/destroy`，仅对 `envId` 做类型归一化 |
+| `envId` | 可传十进制字符串或数字；若传数字，SDK 会在出网前改写成**字符串**形式 |
+| 响应体 | 后端原始 JSON 透传 |
+| 本地副作用 | 后端业务删除成功后，SDK 还会删除本地 `<workDir>/<appId>/userdata/<envId>` 目录 |
 
-- 响应体直接返回后端原始 JSON
+请求示例：
 
-- **注意：销毁环境不等于关闭浏览器**。如果该环境的浏览器仍在运行，请先调用 `browser/close` 并等待 `browser-close-success`，再调用 `env/destroy`
+```json
+{ "envId": "2062428528552448000" }
+```
 
-参数与响应结构不在本文维护，请查阅环境后端对接文档中的 `env/destroy` 接口契约。
+返回码与 5.15 相同，另外请求体不是合法 JSON 时返回 `CL_EINVALID`；业务失败只在响应体里体现。
+
+**注意：销毁环境不等于关闭浏览器**。如果该环境的浏览器仍在运行，请先调用 `browser/close` 并等待 `browser-close-success`，再调用 `env/destroy`；否则本地目录删除会因文件被占用而失败。
 
 ### 5.22 `POST /sdk/v1/shutdown`
 
-同步停止 SDK。
+**当前版本没有实现该端点**。路径常量与请求类型映射存在，但没有对应的 handler 分支，也不在同步 HTTP 白名单里，调用不会触发停机。
 
-当前行为：
-
-- 停止 SDK
-
-- 关闭内嵌 Web API 服务
-
-- 销毁当前单例
+停止 SDK 请使用 C ABI 的 `sdk_shutdown()`（见 6.4.5）：无请求体，返回 `CL_OK` / `CL_WBUSY` / `CL_EINTERNAL`，成功后会关闭内嵌 Web API 服务并销毁单例。该函数不能在任何 SDK 回调线程内调用。
 
 ## 6. 动态库接口参考（C ABI）
 
@@ -2237,11 +2298,24 @@ typedef void(SDK_CALL *sdk_browser_event_cb_t)(const char *data, size_t len,
 
 #### 6.3.1 参数与内存
 
-- `data` / `len`：请求体为 UTF-8 JSON，`len` 是**精确字节数，不含末尾 `\0`**。`data == NULL` 或 `len == 0` 一律返回 `CL_EINVALID`（无请求体的接口除外）。
-- `out_data` / `out_len`：SDK 用 `malloc` 分配，**必须用 `sdk_free()` 释放**；响应体**不保证以 `\0` 结尾**，长度以 `*out_len` 为准。
+各接口的参数名在整章保持一致，含义如下：
+
+| 参数 | 类型 | 可否为 NULL | 语义 |
+| --- | --- | --- | --- |
+| `data` | `const char *` | 否（无请求体的接口不带该参数） | UTF-8 JSON 请求体，不要求以 `\0` 结尾 |
+| `len` | `size_t` | — | `data` 的**精确字节数，不含末尾 `\0`**；为 0 返回 `CL_EINVALID` |
+| `out_data` | `char **` | 多数接口不可为 NULL | 出参：SDK 用 `malloc` 分配的响应体，**由调用方 `sdk_free()` 释放** |
+| `out_len` | `size_t *` | 同上 | 出参：响应体字节数；响应体**不保证以 `\0` 结尾**，必须按此长度使用 |
+| `cpp_handle` | `sdk_handle_t *` | 可以 | 出参：初始化成功后回填 `ISDK *`；传 `NULL` 表示不需要句柄 |
+| `cb` / `user_data` | 回调指针 / `void *` | `cb` 传 NULL 表示注销 | 回调类型见 6.2；`user_data` 原样回传，SDK 不解释其内容 |
+
+其他通用规则：
+
 - 所有带 out 参数的接口在进入函数体时会先把 `*out_data` 置 `NULL`、`*out_len` 置 0，因此失败路径无需释放。约定上"只在成功时读取 `out_data`"（例外见 `sdk_env_netdiag`，失败也会写出结构化诊断 JSON）。
+- `data == NULL` 或 `len == 0` 一律返回 `CL_EINVALID`（无请求体的接口除外）。
 - 大多数接口要求 `out_data` / `out_len` 非空；`sdk_init` 是例外：两者传 `NULL` 会被降级为**异步**执行（等价于 `sdk_init_async`）。
 - 单次请求体上限：Cookie 类接口 16 MiB，`sdk_browser_command` / `sdk_browser_env_check` / `sdk_browser_snapshot` 1 MiB。
+- 需要把内存交回 SDK 的场合（`sdk_cookies_storage_cb_t` 的 `new_data`、`sdk_security_decision_cb_t` 的 `redirect`）必须用 `sdk_malloc()` 分配，由 SDK 释放。
 - 禁止在任意 SDK 回调中调用同步/阻塞接口（如 `sdk_init`、`sdk_shutdown`），否则可能死锁。
 
 #### 6.3.2 返回值分类与通用返回码
@@ -2391,6 +2465,15 @@ int32_t sdk_register_cookies_storage_cb(sdk_cookies_storage_cb_t cb,
 int32_t sdk_register_security_decision_cb(sdk_security_decision_cb_t cb,
                                           void *user_data);
 ```
+
+参数与语义：
+
+| 接口 | 回调类型 | `user_data` | 触发时机 | 注销方式 |
+| --- | --- | --- | --- | --- |
+| `sdk_register_result_cb` | `sdk_result_cb_t` | 有 | 所有异步请求的进度与终态通知 | `cb = NULL` |
+| `sdk_register_log_cb` | `sdk_log_cb_t` | 无 | 每条本地日志行、每条待上报的 server 日志 | `cb = NULL` |
+| `sdk_register_cookies_storage_cb` | `sdk_cookies_storage_cb_t` | 有 | Cookie 持久化落盘/上传之前 | `cb = NULL` |
+| `sdk_register_security_decision_cb` | `sdk_security_decision_cb_t` | 有 | 代理桥按安全规则拦截某请求时 | `cb = NULL` |
 
 - 四个接口都用 `cb = NULL` 注销；注销时内部 `user_data` 一并清空。
 - `sdk_register_result_cb` 需要在 `sdk_init` **之前**注册，否则会漏掉初始化事件。
